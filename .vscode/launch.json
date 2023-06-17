@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "cppvsdbg",
+            "request": "launch",
+            "name": "Game Debug",
+            "program": "${workspaceFolder}/zig-out/bin/game.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/deploy/",
+            "preLaunchTask": "build-debug",
+            "console": "internalConsole",
+        },
+        {
+            "type": "cppvsdbg",
+            "request": "launch",
+            "name": "Game Release",
+            "program": "${workspaceFolder}/zig-out/bin/game.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/deploy/",
+            "preLaunchTask": "build-release-fast",
+            "console": "internalConsole",
+        },
+    ]
+}

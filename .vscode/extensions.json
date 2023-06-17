@@ -1,0 +1,7 @@
+{
+    "recommendations": [
+        "ziglang.vscode-zig",
+        "ms-vscode.cpptools",
+        "exodiusstudios.comment-anchors",
+    ]
+}
