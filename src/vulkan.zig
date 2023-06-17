@@ -83,7 +83,7 @@ pub fn checkResult(result: c.VkResult) !void {
         c.VK_SUCCESS => return,
         else => {
             if (std.debug.runtime_safety) {
-                std.debug.panic("Unsuccessful result: {s} (code: {})", .{
+                std.debug.panic("Vulkan error: {s} (code: {})", .{
                     c.vkResultToString(result),
                     result,
                 });
