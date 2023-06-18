@@ -1,6 +1,6 @@
 const c = @import("c.zig");
 const std = @import("std");
-const util = @import("util.zig");
+const utility = @import("utility.zig");
 const glfw = @import("glfw.zig");
 
 var allocator: std.mem.Allocator = undefined;
@@ -776,7 +776,14 @@ fn createFramebuffers() !void {
 fn createShaderModule(path: []const u8) !c.VkShaderModule {
     log_scoped.info("Creating shader module from \"{s}\" file...", .{path});
 
-    const code = try std.fs.cwd().readFileAllocOptions(allocator, path, util.megabytes(1), null, @alignOf(u32), null);
+    const code = try std.fs.cwd().readFileAllocOptions(
+        allocator,
+        path,
+        utility.megabytes(1),
+        null,
+        @alignOf(u32),
+        null,
+    );
     defer allocator.free(code);
 
     const shader_module_create_info = c.VkShaderModuleCreateInfo{
