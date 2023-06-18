@@ -173,7 +173,7 @@ pub fn init(window: glfw.Window, custom_allocator: std.mem.Allocator) !void {
     };
 
     var version: u32 = 0;
-    try checkResult(c.vkEnumerateInstanceVersion(&version));
+    try checkResult(c.vkEnumerateInstanceVersion.?(&version));
     log_scoped.info("Initialized version {}.{}.{}", .{
         c.VK_VERSION_MAJOR(version),
         c.VK_VERSION_MINOR(version),
@@ -185,17 +185,17 @@ pub fn deinit() void {
     log_scoped.info("Deinitializing...", .{});
 
     if (device != null) {
-        _ = c.vkDeviceWaitIdle(device);
+        _ = c.vkDeviceWaitIdle.?(device);
     }
 
     // createGraphicsPipeline()
     if (pipeline_graphics != null) {
-        c.vkDestroyPipeline(device, pipeline_graphics, &allocation_callbacks);
+        c.vkDestroyPipeline.?(device, pipeline_graphics, &allocation_callbacks);
         pipeline_graphics = null;
     }
 
     if (pipeline_layout != null) {
-        c.vkDestroyPipelineLayout(device, pipeline_layout, &allocation_callbacks);
+        c.vkDestroyPipelineLayout.?(device, pipeline_layout, &allocation_callbacks);
         pipeline_layout = null;
     }
 
@@ -203,7 +203,7 @@ pub fn deinit() void {
     if (framebuffers != null) {
         for (framebuffers.?) |framebuffer| {
             if (framebuffer != null) {
-                c.vkDestroyFramebuffer(device, framebuffer, &allocation_callbacks);
+                c.vkDestroyFramebuffer.?(device, framebuffer, &allocation_callbacks);
             }
         }
 
@@ -213,7 +213,7 @@ pub fn deinit() void {
 
     // createRenderPass()
     if (render_pass != null) {
-        c.vkDestroyRenderPass(device, render_pass, &allocation_callbacks);
+        c.vkDestroyRenderPass.?(device, render_pass, &allocation_callbacks);
         render_pass = null;
     }
 
@@ -221,7 +221,7 @@ pub fn deinit() void {
     if (render_finished_semaphores != null) {
         for (render_finished_semaphores.?) |semaphore| {
             if (semaphore != null) {
-                c.vkDestroySemaphore(device, semaphore, &allocation_callbacks);
+                c.vkDestroySemaphore.?(device, semaphore, &allocation_callbacks);
             }
         }
 
@@ -232,7 +232,7 @@ pub fn deinit() void {
     if (image_available_semaphores != null) {
         for (image_available_semaphores.?) |semaphore| {
             if (semaphore != null) {
-                c.vkDestroySemaphore(device, semaphore, &allocation_callbacks);
+                c.vkDestroySemaphore.?(device, semaphore, &allocation_callbacks);
             }
         }
 
@@ -243,7 +243,7 @@ pub fn deinit() void {
     if (frame_inflight_fences != null) {
         for (frame_inflight_fences.?) |fence| {
             if (fence != null) {
-                c.vkDestroyFence(device, fence, &allocation_callbacks);
+                c.vkDestroyFence.?(device, fence, &allocation_callbacks);
             }
         }
 
@@ -253,14 +253,14 @@ pub fn deinit() void {
 
     // createCommandBuffers()
     if (command_buffers != null) {
-        c.vkFreeCommandBuffers(device, command_pool, @intCast(u32, command_buffers.?.len), command_buffers.?.ptr);
+        c.vkFreeCommandBuffers.?(device, command_pool, @intCast(u32, command_buffers.?.len), command_buffers.?.ptr);
         allocator.free(command_buffers.?);
         command_buffers = null;
     }
 
     // createCommandPool()
     if (command_pool != null) {
-        c.vkDestroyCommandPool(device, command_pool, &allocation_callbacks);
+        c.vkDestroyCommandPool.?(device, command_pool, &allocation_callbacks);
         command_pool = null;
     }
 
@@ -268,7 +268,7 @@ pub fn deinit() void {
     if (swapchain_image_views != null) {
         for (swapchain_image_views.?) |image_view| {
             if (image_view != null) {
-                c.vkDestroyImageView(device, image_view, &allocation_callbacks);
+                c.vkDestroyImageView.?(device, image_view, &allocation_callbacks);
             }
         }
 
@@ -282,7 +282,7 @@ pub fn deinit() void {
     }
 
     if (swapchain != null) {
-        c.vkDestroySwapchainKHR(device, swapchain, &allocation_callbacks);
+        c.vkDestroySwapchainKHR.?(device, swapchain, &allocation_callbacks);
         swapchain = null;
     }
 
@@ -293,7 +293,7 @@ pub fn deinit() void {
 
     // createLogicalDevice()
     if (device != null) {
-        c.vkDestroyDevice(device, &allocation_callbacks);
+        c.vkDestroyDevice.?(device, &allocation_callbacks);
         device = null;
     }
 
@@ -303,7 +303,7 @@ pub fn deinit() void {
 
     // createSurface()
     if (surface != null) {
-        c.vkDestroySurfaceKHR(instance, surface, &allocation_callbacks);
+        c.vkDestroySurfaceKHR.?(instance, surface, &allocation_callbacks);
         surface = null;
     }
 
@@ -316,13 +316,13 @@ pub fn deinit() void {
 
     // createDebugCallback()
     if (debug_callback != null) {
-        c.vkDestroyDebugReportCallbackEXT(instance, debug_callback, &allocation_callbacks);
+        c.vkDestroyDebugReportCallbackEXT.?(instance, debug_callback, &allocation_callbacks);
         debug_callback = null;
     }
 
     // createInstance()
     if (instance != null) {
-        c.vkDestroyInstance(instance, &allocation_callbacks);
+        c.vkDestroyInstance.?(instance, &allocation_callbacks);
         instance = null;
     }
 
@@ -349,6 +349,8 @@ fn getRequiredInstanceExtensions() ![][*c]const u8 {
 fn createInstance() !void {
     log_scoped.info("Creating instance...", .{});
 
+    try checkResult(c.volkInitialize());
+
     const application_info = c.VkApplicationInfo{
         .sType = c.VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .pNext = null,
@@ -373,7 +375,8 @@ fn createInstance() !void {
         .ppEnabledExtensionNames = extensions.ptr,
     };
 
-    try checkResult(c.vkCreateInstance(&create_info, &allocation_callbacks, &instance));
+    try checkResult(c.vkCreateInstance.?(&create_info, &allocation_callbacks, &instance));
+    c.volkLoadInstanceOnly(instance);
 }
 
 fn debugCallback(
@@ -412,7 +415,7 @@ fn createDebugCallback() !void {
         .pUserData = null,
     };
 
-    try checkResult(c.vkCreateDebugReportCallbackEXT(instance, &create_info, &allocation_callbacks, &debug_callback));
+    try checkResult(c.vkCreateDebugReportCallbackEXT.?(instance, &create_info, &allocation_callbacks, &debug_callback));
 }
 
 fn selectPhysicalDevice() !void {
@@ -422,7 +425,7 @@ fn selectPhysicalDevice() !void {
     log_scoped.info("Selecting physical device...", .{});
 
     var physical_device_count: u32 = 0;
-    try checkResult(c.vkEnumeratePhysicalDevices(instance, &physical_device_count, null));
+    try checkResult(c.vkEnumeratePhysicalDevices.?(instance, &physical_device_count, null));
     if (physical_device_count == 0) {
         log_scoped.err("Failed to find any physical devices", .{});
         return error.NoAvailableVulkanDevices;
@@ -430,7 +433,7 @@ fn selectPhysicalDevice() !void {
 
     const physical_devices = try allocator.alloc(c.VkPhysicalDevice, physical_device_count);
     defer allocator.free(physical_devices);
-    try checkResult(c.vkEnumeratePhysicalDevices(instance, &physical_device_count, physical_devices.ptr));
+    try checkResult(c.vkEnumeratePhysicalDevices.?(instance, &physical_device_count, physical_devices.ptr));
 
     const PhysicalDeviceCandidate = struct {
         device: c.VkPhysicalDevice,
@@ -443,8 +446,8 @@ fn selectPhysicalDevice() !void {
 
     for (physical_devices, 0..) |available_device, i| {
         physical_device_candidates[i].device = available_device;
-        c.vkGetPhysicalDeviceProperties(available_device, &physical_device_candidates[i].properties);
-        c.vkGetPhysicalDeviceFeatures(available_device, &physical_device_candidates[i].features);
+        c.vkGetPhysicalDeviceProperties.?(available_device, &physical_device_candidates[i].properties);
+        c.vkGetPhysicalDeviceFeatures.?(available_device, &physical_device_candidates[i].features);
         log_scoped.info("Available GPU: {s}", .{std.mem.sliceTo(&physical_device_candidates[i].properties.deviceName, 0)});
     }
 
@@ -475,7 +478,7 @@ fn createWindowSurface(window: glfw.Window) !void {
     log_scoped.info("Creating window surface...", .{});
 
     try checkResult(c.glfwCreateWindowSurface(instance, window.handle, &allocation_callbacks, &surface));
-    try checkResult(c.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &surface_capabilities));
+    try checkResult(c.vkGetPhysicalDeviceSurfaceCapabilitiesKHR.?(physical_device, surface, &surface_capabilities));
 }
 
 fn selectQueueFamilies() !void {
@@ -485,18 +488,18 @@ fn selectQueueFamilies() !void {
     log_scoped.info("Selecting queue families...", .{});
 
     var queue_family_count: u32 = 0;
-    c.vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, null);
+    c.vkGetPhysicalDeviceQueueFamilyProperties.?(physical_device, &queue_family_count, null);
 
     const queue_families = try allocator.alloc(c.VkQueueFamilyProperties, queue_family_count);
     defer allocator.free(queue_families);
-    c.vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queue_families.ptr);
+    c.vkGetPhysicalDeviceQueueFamilyProperties.?(physical_device, &queue_family_count, queue_families.ptr);
 
     var found_suitable_queue = false;
     for (queue_families, 0..) |queue_family, i| {
         var graphics_support = queue_family.queueFlags & c.VK_QUEUE_GRAPHICS_BIT != 0;
         var present_support: c.VkBool32 = c.VK_FALSE;
 
-        try checkResult(c.vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, @intCast(u32, i), surface, &present_support));
+        try checkResult(c.vkGetPhysicalDeviceSurfaceSupportKHR.?(physical_device, @intCast(u32, i), surface, &present_support));
 
         if (queue_family.queueCount > 0 and graphics_support == true and present_support == c.VK_TRUE) {
             queue_graphics_index = @intCast(u32, i);
@@ -538,8 +541,10 @@ fn createLogicalDevice() !void {
         .pEnabledFeatures = &device_features,
     };
 
-    try checkResult(c.vkCreateDevice(physical_device, &device_create_info, &allocation_callbacks, &device));
-    c.vkGetDeviceQueue(device, queue_graphics_index, 0, &queue_graphics);
+    try checkResult(c.vkCreateDevice.?(physical_device, &device_create_info, &allocation_callbacks, &device));
+    c.volkLoadDevice(device);
+
+    c.vkGetDeviceQueue.?(device, queue_graphics_index, 0, &queue_graphics);
 }
 
 fn createSwapchain(window: glfw.Window) !void {
@@ -577,13 +582,13 @@ fn createSwapchain(window: glfw.Window) !void {
         .oldSwapchain = null,
     };
 
-    try checkResult(c.vkCreateSwapchainKHR(device, &swapchain_create_info, &allocation_callbacks, &swapchain));
+    try checkResult(c.vkCreateSwapchainKHR.?(device, &swapchain_create_info, &allocation_callbacks, &swapchain));
 
     var image_count: u32 = 0;
-    try checkResult(c.vkGetSwapchainImagesKHR(device, swapchain, &image_count, null));
+    try checkResult(c.vkGetSwapchainImagesKHR.?(device, swapchain, &image_count, null));
 
     swapchain_images = try allocator.alloc(c.VkImage, image_count);
-    try checkResult(c.vkGetSwapchainImagesKHR(device, swapchain, &image_count, swapchain_images.?.ptr));
+    try checkResult(c.vkGetSwapchainImagesKHR.?(device, swapchain, &image_count, swapchain_images.?.ptr));
 
     swapchain_image_views = try allocator.alloc(c.VkImageView, image_count);
     for (swapchain_image_views.?) |*image| {
@@ -613,7 +618,7 @@ fn createSwapchain(window: glfw.Window) !void {
             },
         };
 
-        try checkResult(c.vkCreateImageView(device, &image_view_create_info, &allocation_callbacks, &swapchain_image_views.?[i]));
+        try checkResult(c.vkCreateImageView.?(device, &image_view_create_info, &allocation_callbacks, &swapchain_image_views.?[i]));
     }
 
     max_inflight_frames = image_count;
@@ -629,7 +634,7 @@ fn createCommandPool() !void {
         .queueFamilyIndex = queue_graphics_index,
     };
 
-    try checkResult(c.vkCreateCommandPool(device, &command_pool_create_info, &allocation_callbacks, &command_pool));
+    try checkResult(c.vkCreateCommandPool.?(device, &command_pool_create_info, &allocation_callbacks, &command_pool));
 }
 
 fn createCommandBuffers() !void {
@@ -645,7 +650,7 @@ fn createCommandBuffers() !void {
         .commandBufferCount = @intCast(u32, command_buffers.?.len),
     };
 
-    try checkResult(c.vkAllocateCommandBuffers(device, &command_buffer_allocate_info, command_buffers.?.ptr));
+    try checkResult(c.vkAllocateCommandBuffers.?(device, &command_buffer_allocate_info, command_buffers.?.ptr));
 }
 
 fn createRenderSynchronization() !void {
@@ -668,8 +673,8 @@ fn createRenderSynchronization() !void {
             .flags = 0,
         };
 
-        try checkResult(c.vkCreateSemaphore(device, &semaphore_create_info, &allocation_callbacks, &image_available_semaphores.?[i]));
-        try checkResult(c.vkCreateSemaphore(device, &semaphore_create_info, &allocation_callbacks, &render_finished_semaphores.?[i]));
+        try checkResult(c.vkCreateSemaphore.?(device, &semaphore_create_info, &allocation_callbacks, &image_available_semaphores.?[i]));
+        try checkResult(c.vkCreateSemaphore.?(device, &semaphore_create_info, &allocation_callbacks, &render_finished_semaphores.?[i]));
 
         const fence_create_info = c.VkFenceCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -677,7 +682,7 @@ fn createRenderSynchronization() !void {
             .flags = c.VK_FENCE_CREATE_SIGNALED_BIT,
         };
 
-        try checkResult(c.vkCreateFence(device, &fence_create_info, &allocation_callbacks, &frame_inflight_fences.?[i]));
+        try checkResult(c.vkCreateFence.?(device, &fence_create_info, &allocation_callbacks, &frame_inflight_fences.?[i]));
     }
 }
 
@@ -736,7 +741,7 @@ fn createRenderPass() !void {
         .pDependencies = &subpass_dependency,
     };
 
-    try checkResult(c.vkCreateRenderPass(device, &render_pass_create_info, &allocation_callbacks, &render_pass));
+    try checkResult(c.vkCreateRenderPass.?(device, &render_pass_create_info, &allocation_callbacks, &render_pass));
 }
 
 fn createFramebuffers() !void {
@@ -764,7 +769,7 @@ fn createFramebuffers() !void {
             .layers = 1,
         };
 
-        try checkResult(c.vkCreateFramebuffer(device, &framebuffer_create_info, &allocation_callbacks, &framebuffers.?[i]));
+        try checkResult(c.vkCreateFramebuffer.?(device, &framebuffer_create_info, &allocation_callbacks, &framebuffers.?[i]));
     }
 }
 
@@ -783,7 +788,7 @@ fn createShaderModule(path: []const u8) !c.VkShaderModule {
     };
 
     var shader_module: c.VkShaderModule = null;
-    try checkResult(c.vkCreateShaderModule(device, &shader_module_create_info, &allocation_callbacks, &shader_module));
+    try checkResult(c.vkCreateShaderModule.?(device, &shader_module_create_info, &allocation_callbacks, &shader_module));
     return shader_module;
 }
 
@@ -802,13 +807,13 @@ fn createGraphicsPipeline() !void {
         .pPushConstantRanges = null,
     };
 
-    try checkResult(c.vkCreatePipelineLayout(device, &pipeline_layout_create_info, &allocation_callbacks, &pipeline_layout));
+    try checkResult(c.vkCreatePipelineLayout.?(device, &pipeline_layout_create_info, &allocation_callbacks, &pipeline_layout));
 
     const vertex_shader_module = try createShaderModule("data/shaders/simple.vert.spv");
-    defer c.vkDestroyShaderModule(device, vertex_shader_module, &allocation_callbacks);
+    defer c.vkDestroyShaderModule.?(device, vertex_shader_module, &allocation_callbacks);
 
     const fragment_shader_module = try createShaderModule("data/shaders/simple.frag.spv");
-    defer c.vkDestroyShaderModule(device, fragment_shader_module, &allocation_callbacks);
+    defer c.vkDestroyShaderModule.?(device, fragment_shader_module, &allocation_callbacks);
 
     const vertex_shader_stage_info = c.VkPipelineShaderStageCreateInfo{
         .sType = c.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -948,7 +953,7 @@ fn createGraphicsPipeline() !void {
         .basePipelineIndex = 0,
     };
 
-    try checkResult(c.vkCreateGraphicsPipelines(device, null, 1, &graphics_pipeline_create_info, &allocation_callbacks, &pipeline_graphics));
+    try checkResult(c.vkCreateGraphicsPipelines.?(device, null, 1, &graphics_pipeline_create_info, &allocation_callbacks, &pipeline_graphics));
 }
 
 fn recordCommandBuffer(command_buffer: c.VkCommandBuffer, image_index: u32) !void {
@@ -959,7 +964,7 @@ fn recordCommandBuffer(command_buffer: c.VkCommandBuffer, image_index: u32) !voi
         .pInheritanceInfo = null,
     };
 
-    try checkResult(c.vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info));
+    try checkResult(c.vkBeginCommandBuffer.?(command_buffer, &command_buffer_begin_info));
 
     var render_pass_begin_info = c.VkRenderPassBeginInfo{
         .sType = c.VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -981,8 +986,8 @@ fn recordCommandBuffer(command_buffer: c.VkCommandBuffer, image_index: u32) !voi
         },
     };
 
-    c.vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info, c.VK_SUBPASS_CONTENTS_INLINE);
-    c.vkCmdBindPipeline(command_buffer, c.VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_graphics);
+    c.vkCmdBeginRenderPass.?(command_buffer, &render_pass_begin_info, c.VK_SUBPASS_CONTENTS_INLINE);
+    c.vkCmdBindPipeline.?(command_buffer, c.VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_graphics);
 
     const viewport = c.VkViewport{
         .x = 0.0,
@@ -993,7 +998,7 @@ fn recordCommandBuffer(command_buffer: c.VkCommandBuffer, image_index: u32) !voi
         .maxDepth = 1.0,
     };
 
-    c.vkCmdSetViewport(command_buffer, 0, 1, &viewport);
+    c.vkCmdSetViewport.?(command_buffer, 0, 1, &viewport);
 
     const scissors = c.VkRect2D{
         .offset = c.VkOffset2D{
@@ -1003,22 +1008,22 @@ fn recordCommandBuffer(command_buffer: c.VkCommandBuffer, image_index: u32) !voi
         .extent = swapchain_extent,
     };
 
-    c.vkCmdSetScissor(command_buffer, 0, 1, &scissors);
+    c.vkCmdSetScissor.?(command_buffer, 0, 1, &scissors);
 
-    c.vkCmdDraw(command_buffer, 3, 1, 0, 0);
-    c.vkCmdEndRenderPass(command_buffer);
+    c.vkCmdDraw.?(command_buffer, 3, 1, 0, 0);
+    c.vkCmdEndRenderPass.?(command_buffer);
 
-    try checkResult(c.vkEndCommandBuffer(command_buffer));
+    try checkResult(c.vkEndCommandBuffer.?(command_buffer));
 }
 
 pub fn render() !void {
-    try checkResult(c.vkWaitForFences(device, 1, &frame_inflight_fences.?[frame_current], c.VK_TRUE, std.math.maxInt(u64)));
-    try checkResult(c.vkResetFences(device, 1, &frame_inflight_fences.?[frame_current]));
+    try checkResult(c.vkWaitForFences.?(device, 1, &frame_inflight_fences.?[frame_current], c.VK_TRUE, std.math.maxInt(u64)));
+    try checkResult(c.vkResetFences.?(device, 1, &frame_inflight_fences.?[frame_current]));
 
     var image_current: u32 = 0;
-    try checkResult(c.vkAcquireNextImageKHR(device, swapchain, std.math.maxInt(u64), image_available_semaphores.?[frame_current], null, &image_current));
+    try checkResult(c.vkAcquireNextImageKHR.?(device, swapchain, std.math.maxInt(u64), image_available_semaphores.?[frame_current], null, &image_current));
 
-    try checkResult(c.vkResetCommandBuffer(command_buffers.?[frame_current], 0));
+    try checkResult(c.vkResetCommandBuffer.?(command_buffers.?[frame_current], 0));
     try recordCommandBuffer(command_buffers.?[frame_current], image_current);
 
     const submit_wait_semaphores = [_]c.VkSemaphore{
@@ -1051,7 +1056,7 @@ pub fn render() !void {
         .pSignalSemaphores = &submit_signal_semaphores[0],
     };
 
-    try checkResult(c.vkQueueSubmit(queue_graphics, 1, &submit_info, frame_inflight_fences.?[frame_current]));
+    try checkResult(c.vkQueueSubmit.?(queue_graphics, 1, &submit_info, frame_inflight_fences.?[frame_current]));
 
     const present_info = c.VkPresentInfoKHR{
         .sType = c.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -1064,6 +1069,6 @@ pub fn render() !void {
         .pResults = null,
     };
 
-    try checkResult(c.vkQueuePresentKHR(queue_graphics, &present_info));
+    try checkResult(c.vkQueuePresentKHR.?(queue_graphics, &present_info));
     frame_current = (frame_current + 1) % max_inflight_frames;
 }

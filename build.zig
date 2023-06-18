@@ -1,9 +1,45 @@
 const std = @import("std");
 
+const Environment = struct {
+    vulkan_sdk: []u8,
+    vulkan_include: []u8,
+    vulkan_lib: []u8,
+
+    pub fn init() !Environment {
+        const vulkan_sdk = try std.process.getEnvVarOwned(allocator, "VULKAN_SDK");
+        errdefer allocator.free(vulkan_sdk);
+
+        const vulkan_include = try std.fmt.allocPrintZ(allocator, "{s}{s}", .{ vulkan_sdk, "/Include/" });
+        errdefer allocator.free(vulkan_include);
+
+        const vulkan_lib = try std.fmt.allocPrintZ(allocator, "{s}{s}", .{ vulkan_sdk, "/Lib/" });
+        errdefer allocator.free(vulkan_lib);
+
+        return Environment{
+            .vulkan_sdk = vulkan_sdk,
+            .vulkan_include = vulkan_include,
+            .vulkan_lib = vulkan_lib,
+        };
+    }
+
+    pub fn deinit(self: *Environment) void {
+        allocator.free(self.vulkan_sdk);
+        allocator.free(self.vulkan_include);
+        allocator.free(self.vulkan_lib);
+    }
+};
+
+var allocator: std.mem.Allocator = undefined;
+var environment: Environment = undefined;
 var target: std.zig.CrossTarget = undefined;
 var optimize: std.builtin.Mode = undefined;
 
 pub fn build(builder: *std.build.Builder) !void {
+    allocator = builder.allocator;
+
+    environment = try Environment.init();
+    defer environment.deinit();
+
     target = builder.standardTargetOptions(.{});
     optimize = builder.standardOptimizeOption(.{});
 
@@ -18,7 +54,7 @@ fn addDependencyMimalloc(builder: *std.build.Builder, exe: *std.build.LibExeObjS
         .optimize = optimize,
     });
 
-    var flags = std.ArrayList([]const u8).init(builder.allocator);
+    var flags = std.ArrayList([]const u8).init(allocator);
     defer flags.deinit();
 
     try flags.append("-DMI_STATIC_LIB");
@@ -60,6 +96,53 @@ fn addDependencyMimalloc(builder: *std.build.Builder, exe: *std.build.LibExeObjS
     exe.linkLibrary(mimalloc);
 }
 
+fn addDependencyVulkan(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
+    const vulkan = builder.addStaticLibrary(.{
+        .name = "vulkan",
+        .target = target,
+        .optimize = optimize,
+    });
+
+    var flags = std.ArrayList([]const u8).init(builder.allocator);
+    defer flags.deinit();
+
+    try flags.append("-std=c++11");
+
+    vulkan.addIncludePath(environment.vulkan_include);
+    vulkan.addCSourceFile("src/c/vulkan.cpp", flags.items);
+    vulkan.linkLibCpp();
+
+    exe.addIncludePath(environment.vulkan_include);
+    exe.linkLibrary(vulkan);
+}
+
+fn addDependencyVolk(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
+    const volk = builder.addStaticLibrary(.{
+        .name = "volk",
+        .target = target,
+        .optimize = optimize,
+    });
+
+    var flags = std.ArrayList([]const u8).init(allocator);
+    defer flags.deinit();
+
+    switch (target.getOsTag()) {
+        .windows => {
+            try flags.append("-DVK_USE_PLATFORM_WIN32_KHR");
+            exe.defineCMacroRaw("VK_USE_PLATFORM_WIN32_KHR");
+        },
+        else => unreachable,
+    }
+
+    volk.addIncludePath(environment.vulkan_include);
+    volk.addIncludePath("deps/volk/");
+    volk.addCSourceFile("deps/volk/volk.c", flags.items);
+    volk.linkLibC();
+
+    exe.addIncludePath("deps/volk/");
+    exe.linkLibrary(volk);
+}
+
 fn addDependencyGlfw(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
     const glfw = builder.addStaticLibrary(.{
         .name = "glfw",
@@ -67,7 +150,7 @@ fn addDependencyGlfw(builder: *std.build.Builder, exe: *std.build.LibExeObjStep)
         .optimize = if (optimize != .Debug) .ReleaseSmall else optimize,
     });
 
-    var flags = std.ArrayList([]const u8).init(builder.allocator);
+    var flags = std.ArrayList([]const u8).init(allocator);
     defer flags.deinit();
 
     switch (target.getOsTag()) {
@@ -105,37 +188,6 @@ fn addDependencyGlfw(builder: *std.build.Builder, exe: *std.build.LibExeObjStep)
     exe.linkLibrary(glfw);
 }
 
-fn addDependencyVulkan(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
-    const vulkan_sdk = try std.process.getEnvVarOwned(builder.allocator, "VULKAN_SDK");
-    defer builder.allocator.free(vulkan_sdk);
-
-    const vulkan_lib = try std.fmt.allocPrintZ(builder.allocator, "{s}{s}", .{ vulkan_sdk, "/Lib/" });
-    defer builder.allocator.free(vulkan_lib);
-
-    const vulkan_include = try std.fmt.allocPrintZ(builder.allocator, "{s}{s}", .{ vulkan_sdk, "/Include/" });
-    defer builder.allocator.free(vulkan_include);
-
-    const vulkan = builder.addStaticLibrary(.{
-        .name = "vulkan",
-        .target = target,
-        .optimize = optimize,
-    });
-
-    var flags = std.ArrayList([]const u8).init(builder.allocator);
-    defer flags.deinit();
-
-    try flags.append("-std=c++11");
-
-    vulkan.addIncludePath(vulkan_include);
-    vulkan.addCSourceFile("src/c/vulkan.cpp", flags.items);
-    vulkan.linkLibCpp();
-
-    exe.addLibraryPath(vulkan_lib);
-    exe.addIncludePath(vulkan_include);
-    exe.linkSystemLibrary("vulkan-1");
-    exe.linkLibrary(vulkan);
-}
-
 fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
     const input_dir_path = "assets/shaders/";
     const output_dir_path = "deploy/data/shaders/";
@@ -144,7 +196,7 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
     var input_dir = try std.fs.cwd().openIterableDir(input_dir_path, .{});
     defer input_dir.close();
 
-    var walker = try input_dir.walk(builder.allocator);
+    var walker = try input_dir.walk(allocator);
     defer walker.deinit();
 
     while (try walker.next()) |entry| {
@@ -152,11 +204,11 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
             continue;
         }
 
-        const input_file_path = try std.fs.path.join(builder.allocator, &[_][]const u8{ input_dir_path, entry.path });
-        defer builder.allocator.free(input_file_path);
+        const input_file_path = try std.fs.path.join(allocator, &[_][]const u8{ input_dir_path, entry.path });
+        defer allocator.free(input_file_path);
 
-        const output_file_path = try std.fmt.allocPrint(builder.allocator, "{s}{s}.spv", .{ output_dir_path, entry.basename });
-        defer builder.allocator.free(output_file_path);
+        const output_file_path = try std.fmt.allocPrint(allocator, "{s}{s}.spv", .{ output_dir_path, entry.basename });
+        defer allocator.free(output_file_path);
 
         const glslc = builder.addSystemCommand(&[_][]const u8{
             "glslc",
@@ -184,8 +236,9 @@ fn createGame(builder: *std.build.Builder) !void {
 
     game.addIncludePath("src/c/");
     try addDependencyMimalloc(builder, game);
-    try addDependencyGlfw(builder, game);
+    try addDependencyVolk(builder, game);
     try addDependencyVulkan(builder, game);
+    try addDependencyGlfw(builder, game);
     try compileShaders(builder, game);
     builder.installArtifact(game);
 
