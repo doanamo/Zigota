@@ -61,17 +61,31 @@ pub fn pollEvents() void {
     c.glfwPollEvents();
 }
 
+pub const WindowConfig = struct {
+    title: [:0]const u8,
+    width: i32 = 1024,
+    height: i32 = 576,
+    resizable: bool = false,
+    visible: bool = false,
+};
+
 pub const Window = struct {
     handle: *c.GLFWwindow,
 
-    pub fn init() !Window {
+    pub fn init(config: *const WindowConfig) !Window {
         log_scoped.info("Creating window...", .{});
 
         c.glfwWindowHint(c.GLFW_CLIENT_API, c.GLFW_NO_API);
-        c.glfwWindowHint(c.GLFW_RESIZABLE, c.GLFW_FALSE);
-        c.glfwWindowHint(c.GLFW_VISIBLE, c.GLFW_FALSE);
+        c.glfwWindowHint(c.GLFW_RESIZABLE, if (config.resizable) c.GLFW_TRUE else c.GLFW_FALSE);
+        c.glfwWindowHint(c.GLFW_VISIBLE, if (config.visible) c.GLFW_TRUE else c.GLFW_FALSE);
 
-        const handle = c.glfwCreateWindow(1024, 576, "Game", null, null);
+        const handle = c.glfwCreateWindow(
+            config.width,
+            config.height,
+            config.title.ptr,
+            null,
+            null,
+        );
         if (handle == null) {
             log_scoped.err("Failed to create window", .{});
             return error.FailedToCreateGLFWWindow;

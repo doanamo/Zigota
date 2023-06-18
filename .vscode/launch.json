@@ -5,7 +5,7 @@
             "type": "cppvsdbg",
             "request": "launch",
             "name": "Game Debug",
-            "program": "${workspaceFolder}/zig-out/bin/game.exe",
+            "program": "${workspaceFolder}/zig-out/bin/debug/game.exe",
             "args": [],
             "cwd": "${workspaceFolder}/deploy/",
             "preLaunchTask": "build-debug",
@@ -14,12 +14,22 @@
         {
             "type": "cppvsdbg",
             "request": "launch",
-            "name": "Game Release",
-            "program": "${workspaceFolder}/zig-out/bin/game.exe",
+            "name": "Game Release Safe",
+            "program": "${workspaceFolder}/zig-out/bin/release-safe/game.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/deploy/",
+            "preLaunchTask": "build-release-safe",
+            "console": "internalConsole",
+        },
+        {
+            "type": "cppvsdbg",
+            "request": "launch",
+            "name": "Game Release Fast",
+            "program": "${workspaceFolder}/zig-out/bin/release-fast/game.exe",
             "args": [],
             "cwd": "${workspaceFolder}/deploy/",
             "preLaunchTask": "build-release-fast",
             "console": "internalConsole",
-        },
+        }
     ]
 }

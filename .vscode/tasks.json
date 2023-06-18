@@ -4,13 +4,19 @@
         {
             "label": "build-debug",
             "type": "shell",
-            "command": "zig build -Doptimize=Debug",
+            "command": "zig build -Doptimize=Debug --prefix-exe-dir bin/debug",
+            "group": "build",
+        },
+        {
+            "label": "build-release-safe",
+            "type": "shell",
+            "command": "zig build -Doptimize=ReleaseSafe --prefix-exe-dir bin/release-safe",
             "group": "build",
         },
         {
             "label": "build-release-fast",
             "type": "shell",
-            "command": "zig build -Doptimize=ReleaseFast",
+            "command": "zig build -Doptimize=ReleaseFast --prefix-exe-dir bin/release-fast",
             "group": "build",
         }
     ]
