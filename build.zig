@@ -1,30 +1,28 @@
 const std = @import("std");
 
 var target: std.zig.CrossTarget = undefined;
-var mode: std.builtin.Mode = undefined;
+var optimize: std.builtin.Mode = undefined;
 
-pub fn build(builder: *std.build.Builder) void {
+pub fn build(builder: *std.build.Builder) !void {
     target = builder.standardTargetOptions(.{});
-    mode = builder.standardReleaseOptions();
+    optimize = builder.standardOptimizeOption(.{});
 
-    createGame(builder) catch undefined;
-    createTests(builder) catch undefined;
+    try createGame(builder);
+    try createTests(builder);
 }
 
 fn addDependencyMimalloc(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
-    const mimalloc = builder.addStaticLibrary("mimalloc", null);
-    mimalloc.setTarget(target);
-    mimalloc.setBuildMode(mode);
+    const mimalloc = builder.addStaticLibrary(.{
+        .name = "mimalloc",
+        .target = target,
+        .optimize = optimize,
+    });
 
     var flags = std.ArrayList([]const u8).init(builder.allocator);
+    defer flags.deinit();
+
     try flags.append("-DMI_STATIC_LIB");
-
-    if (mode == .Debug) {
-        // NOTE Workaround for not being able to debug C code
-        try flags.append("-g");
-    }
-
-    if (mode == .Debug or mode == .ReleaseSafe) {
+    if (optimize == .Debug or optimize == .ReleaseSafe) {
         try flags.append("-DMI_SECURE=4");
     }
 
@@ -63,17 +61,14 @@ fn addDependencyMimalloc(builder: *std.build.Builder, exe: *std.build.LibExeObjS
 }
 
 fn addDependencyGlfw(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
-    const glfw = builder.addStaticLibrary("glfw", null);
-    glfw.setTarget(target);
-
-    // Compile GLFW with optimizations for size
-    glfw.setBuildMode(if (mode != .Debug) .ReleaseSmall else mode);
+    const glfw = builder.addStaticLibrary(.{
+        .name = "glfw",
+        .target = target,
+        .optimize = if (optimize != .Debug) .ReleaseSmall else optimize,
+    });
 
     var flags = std.ArrayList([]const u8).init(builder.allocator);
-    if (mode == .Debug) {
-        // NOTE Workaround for not being able to debug C code
-        try flags.append("-g");
-    }
+    defer flags.deinit();
 
     switch (target.getOsTag()) {
         .windows => {
@@ -104,7 +99,6 @@ fn addDependencyGlfw(builder: *std.build.Builder, exe: *std.build.LibExeObjStep)
         "deps/glfw/src/vulkan.c",
         "deps/glfw/src/window.c",
     }, flags.items);
-
     glfw.linkLibC();
 
     exe.addIncludePath("deps/glfw/include/");
@@ -121,15 +115,15 @@ fn addDependencyVulkan(builder: *std.build.Builder, exe: *std.build.LibExeObjSte
     const vulkan_include = try std.fmt.allocPrintZ(builder.allocator, "{s}{s}", .{ vulkan_sdk, "/Include/" });
     defer builder.allocator.free(vulkan_include);
 
-    const vulkan = builder.addStaticLibrary("vulkan", null);
-    vulkan.setTarget(target);
-    vulkan.setBuildMode(mode);
+    const vulkan = builder.addStaticLibrary(.{
+        .name = "vulkan",
+        .target = target,
+        .optimize = optimize,
+    });
 
     var flags = std.ArrayList([]const u8).init(builder.allocator);
-    if (mode == .Debug) {
-        // NOTE Workaround for not being able to debug C code
-        try flags.append("-g");
-    }
+    defer flags.deinit();
+
     try flags.append("-std=c++11");
 
     vulkan.addIncludePath(vulkan_include);
@@ -154,7 +148,7 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
     defer walker.deinit();
 
     while (try walker.next()) |entry| {
-        if (entry.kind != .File) {
+        if (entry.kind != .file) {
             continue;
         }
 
@@ -177,19 +171,15 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
 }
 
 fn createGame(builder: *std.build.Builder) !void {
-    const game = builder.addExecutable("game", "src/main.zig");
-    game.setTarget(target);
-    game.setBuildMode(mode);
+    const game = builder.addExecutable(.{
+        .name = "game",
+        .root_source_file = .{ .path = "src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
 
-    if (mode == .ReleaseSmall) {
-        // NOTE Workaround for errors in release-small mode
-        // https://github.com/ziglang/zig/issues/13405
-        game.strip = true;
-    }
-
-    if (mode == .ReleaseFast or mode == .ReleaseSmall) {
-        // Hide console window in release mode
-        game.subsystem = .Windows;
+    if (optimize == .ReleaseFast or optimize == .ReleaseSmall) {
+        game.subsystem = .Windows; // Hide console window
     }
 
     game.addIncludePath("src/c/");
@@ -197,18 +187,21 @@ fn createGame(builder: *std.build.Builder) !void {
     try addDependencyGlfw(builder, game);
     try addDependencyVulkan(builder, game);
     try compileShaders(builder, game);
-    game.install();
+    builder.installArtifact(game);
 
-    const run_cmd = game.run();
+    const run = builder.addRunArtifact(game);
     const run_step = builder.step("run", "Run game");
-    run_step.dependOn(&run_cmd.step);
+    run_step.dependOn(&run.step);
 }
 
 fn createTests(builder: *std.build.Builder) !void {
-    const exe_tests = builder.addTest("src/main.zig");
-    exe_tests.setTarget(target);
-    exe_tests.setBuildMode(mode);
+    const exe_tests = builder.addTest(.{
+        .name = "tests",
+        .root_source_file = .{ .path = "src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
 
-    const test_step = builder.step("test", "Run unit tests");
+    const test_step = builder.step("test", "Run tests");
     test_step.dependOn(&exe_tests.step);
 }

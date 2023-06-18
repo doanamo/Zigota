@@ -441,7 +441,7 @@ fn selectPhysicalDevice() !void {
     const physical_device_candidates = try allocator.alloc(PhysicalDeviceCandidate, physical_device_count);
     defer allocator.free(physical_device_candidates);
 
-    for (physical_devices) |available_device, i| {
+    for (physical_devices, 0..) |available_device, i| {
         physical_device_candidates[i].device = available_device;
         c.vkGetPhysicalDeviceProperties(available_device, &physical_device_candidates[i].properties);
         c.vkGetPhysicalDeviceFeatures(available_device, &physical_device_candidates[i].features);
@@ -449,12 +449,12 @@ fn selectPhysicalDevice() !void {
     }
 
     const DevicePrioritization = struct {
-        fn sort(_: void, a: PhysicalDeviceCandidate, b: PhysicalDeviceCandidate) bool {
+        fn lessThan(_: void, a: PhysicalDeviceCandidate, b: PhysicalDeviceCandidate) bool {
             return a.properties.deviceType > b.properties.deviceType; // Prefer discrete GPU over integrated GPU
         }
     };
 
-    std.sort.sort(PhysicalDeviceCandidate, physical_device_candidates, {}, DevicePrioritization.sort);
+    std.sort.insertion(PhysicalDeviceCandidate, physical_device_candidates, {}, DevicePrioritization.lessThan);
 
     physical_device = physical_device_candidates[0].device;
     physical_device_properties = physical_device_candidates[0].properties;
@@ -492,7 +492,7 @@ fn selectQueueFamilies() !void {
     c.vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queue_families.ptr);
 
     var found_suitable_queue = false;
-    for (queue_families) |queue_family, i| {
+    for (queue_families, 0..) |queue_family, i| {
         var graphics_support = queue_family.queueFlags & c.VK_QUEUE_GRAPHICS_BIT != 0;
         var present_support: c.VkBool32 = c.VK_FALSE;
 
@@ -590,7 +590,7 @@ fn createSwapchain(window: glfw.Window) !void {
         image.* = null;
     }
 
-    for (swapchain_images.?) |image, i| {
+    for (swapchain_images.?, 0..) |image, i| {
         const image_view_create_info = c.VkImageViewCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .pNext = null,
@@ -655,13 +655,13 @@ fn createRenderSynchronization() !void {
     render_finished_semaphores = try allocator.alloc(c.VkSemaphore, max_inflight_frames);
     frame_inflight_fences = try allocator.alloc(c.VkFence, max_inflight_frames);
 
-    for (util.range(max_inflight_frames)) |_, i| {
+    for (0..max_inflight_frames) |i| {
         image_available_semaphores.?[i] = null;
         render_finished_semaphores.?[i] = null;
         frame_inflight_fences.?[i] = null;
     }
 
-    for (util.range(max_inflight_frames)) |_, i| {
+    for (0..max_inflight_frames) |i| {
         const semaphore_create_info = c.VkSemaphoreCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
             .pNext = null,
@@ -747,7 +747,7 @@ fn createFramebuffers() !void {
         framebuffer.* = null;
     }
 
-    for (swapchain_image_views.?) |image_view, i| {
+    for (swapchain_image_views.?, 0..) |image_view, i| {
         const attachments = [_]c.VkImageView{
             image_view,
         };

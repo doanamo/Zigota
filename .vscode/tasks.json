@@ -4,15 +4,13 @@
         {
             "label": "build-debug",
             "type": "shell",
-            "command": "zig",
-            "args": ["build"],
+            "command": "zig build -Doptimize=Debug",
             "group": "build",
         },
         {
             "label": "build-release-fast",
             "type": "shell",
-            "command": "zig",
-            "args": ["build", "-Drelease-fast"],
+            "command": "zig build -Doptimize=ReleaseFast",
             "group": "build",
         }
     ]

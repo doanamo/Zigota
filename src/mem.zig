@@ -19,54 +19,52 @@ pub const MimallocAllocator = std.mem.Allocator{
     },
 };
 
+pub fn calculateAlignmentFromLog2(log2_align: u8) usize {
+    return @as(usize, 1) << @intCast(std.mem.Allocator.Log2Align, log2_align);
+}
+
 fn alloc(
-    _: *anyopaque,
+    ctx: *anyopaque,
     len: usize,
-    ptr_align: u29,
-    len_align: u29,
+    log2_align: u8,
     return_address: usize,
-) error{OutOfMemory}![]u8 {
+) ?[*]u8 {
+    _ = ctx;
     _ = return_address;
 
     std.debug.assert(len > 0);
-    std.debug.assert(std.math.isPowerOfTwo(ptr_align));
-
-    const ptr = @ptrCast([*]u8, c.mi_malloc_aligned(len, ptr_align) orelse return error.OutOfMemory);
-    if (len_align == 0) {
-        return ptr[0..len];
-    }
-
-    const full_len = c.mi_usable_size(ptr);
-    return ptr[0..std.mem.alignBackwardAnyAlign(full_len, len_align)];
+    const alignment = calculateAlignmentFromLog2(log2_align);
+    const ptr = c.mi_malloc_aligned(len, alignment);
+    return @ptrCast([*]u8, ptr);
 }
 
 fn resize(
     ptr: *anyopaque,
     buf: []u8,
-    buf_align: u29,
+    log2_align: u8,
     new_len: usize,
-    len_align: u29,
     ret_addr: usize,
-) ?usize {
+) bool {
     _ = ret_addr;
-    _ = buf_align;
+    _ = log2_align;
     _ = ptr;
 
     if (new_len <= buf.len) {
-        return std.mem.alignAllocLen(buf.len, new_len, len_align);
+        return true;
     }
 
     const full_len = c.mi_usable_size(buf.ptr);
     if (new_len <= full_len) {
-        return std.mem.alignAllocLen(full_len, new_len, len_align);
+        return true;
     }
 
-    return null;
+    return false;
 }
 
-fn free(ptr: *anyopaque, buf: []u8, buf_align: u29, ret_addr: usize) void {
+fn free(ptr: *anyopaque, buf: []u8, log2_align: u8, ret_addr: usize) void {
     _ = ptr;
     _ = ret_addr;
 
-    c.mi_free_size_aligned(buf.ptr, buf.len, buf_align);
+    const alignment = calculateAlignmentFromLog2(log2_align);
+    c.mi_free_size_aligned(buf.ptr, buf.len, alignment);
 }
