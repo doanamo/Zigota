@@ -577,7 +577,7 @@ fn createSwapchain(window: glfw.Window) !void {
         .pQueueFamilyIndices = null,
         .preTransform = surface_capabilities.currentTransform,
         .compositeAlpha = c.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-        .presentMode = c.VK_PRESENT_MODE_FIFO_KHR,
+        .presentMode = c.VK_PRESENT_MODE_IMMEDIATE_KHR, // TODO Allow toggling Vsync
         .clipped = c.VK_TRUE,
         .oldSwapchain = null,
     };

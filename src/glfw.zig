@@ -116,6 +116,10 @@ pub const Window = struct {
         c.glfwHideWindow(self.handle);
     }
 
+    pub fn setTitle(self: *Window, title: [:0]const u8) void {
+        c.glfwSetWindowTitle(self.handle, title.ptr);
+    }
+
     pub fn shouldClose(self: *const Window) bool {
         return c.glfwWindowShouldClose(self.handle) == c.GLFW_TRUE;
     }
