@@ -5,9 +5,7 @@ const memory = @import("memory.zig");
 const glfw = @import("glfw.zig");
 const vulkan = @import("vulkan.zig");
 
-var allocator: std.mem.Allocator = memory.MimallocAllocator;
-
-const log_level: std.log.Level = if (std.builtin.mode == .Debug) .debug else .info;
+const allocator: std.mem.Allocator = memory.MimallocAllocator;
 const log_scoped = std.log.scoped(.Main);
 
 fn formatWindowTitle(buffer: []u8, title: []const u8, time_delta: f32) ![:0]u8 {
