@@ -33,7 +33,7 @@ pub fn main() !void {
     var window_title_buffer = try allocator.alloc(u8, 256);
     defer allocator.free(window_title_buffer);
 
-    const window_title = "Game";
+    const window_title = "Zigota";
     var window_config = glfw.WindowConfig{
         .title = try formatWindowTitle(window_title_buffer, window_title, 0.0, 0.0),
         .width = 1024,
