@@ -17,7 +17,6 @@ const present_mode = PresentMode.Fifo;
 
 const validation_layers = &[_][*]const u8{
     "VK_LAYER_KHRONOS_validation",
-    "VK_LAYER_KHRONOS_synchronization2",
 };
 
 const device_extensions = &[_][*]const u8{
