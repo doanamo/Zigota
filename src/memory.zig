@@ -1,14 +1,14 @@
 const c = @import("c.zig");
 const std = @import("std");
 
-pub fn init() !void {
+pub const default_allocator = MimallocAllocator;
+
+pub fn setup() void {
     if (std.debug.runtime_safety) {
         c.mi_option_set(c.mi_option_show_stats, 1);
         c.mi_option_set(c.mi_option_verbose, 1);
     }
 }
-
-pub fn deinit() void {}
 
 pub const MimallocAllocator = std.mem.Allocator{
     .ptr = undefined,

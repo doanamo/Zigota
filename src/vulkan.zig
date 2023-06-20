@@ -2,8 +2,10 @@ const c = @import("c.zig");
 const std = @import("std");
 const utility = @import("utility.zig");
 const glfw = @import("glfw.zig");
+const memory = @import("vulkan/memory.zig");
 
 var allocator: std.mem.Allocator = undefined;
+const vulkan_allocator = &memory.vulkan_allocator;
 const log_scoped = std.log.scoped(.Vulkan);
 
 const PresentMode = enum(c.VkPresentModeKHR) {
@@ -23,7 +25,6 @@ const device_extensions = &[_][*]const u8{
     c.VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 };
 
-var allocation_callbacks: c.VkAllocationCallbacks = undefined;
 var physical_device_properties: c.VkPhysicalDeviceProperties = undefined;
 var physical_device_features: c.VkPhysicalDeviceFeatures = undefined;
 var surface_capabilities: c.VkSurfaceCapabilitiesKHR = undefined;
@@ -56,34 +57,6 @@ var framebuffers: ?[]c.VkFramebuffer = null;
 var pipeline_layout: c.VkPipelineLayout = null;
 var pipeline_graphics: c.VkPipeline = null;
 
-fn allocationCallback(
-    user_data: ?*anyopaque,
-    size: usize,
-    alignment: usize,
-    allocation_scope: c.VkSystemAllocationScope,
-) callconv(.C) ?*anyopaque {
-    _ = allocation_scope;
-    _ = user_data;
-    return c.mi_malloc_aligned(size, alignment);
-}
-
-fn reallocationCallback(
-    user_data: ?*anyopaque,
-    old_allocation: ?*anyopaque,
-    size: usize,
-    alignment: usize,
-    allocation_scope: c.VkSystemAllocationScope,
-) callconv(.C) ?*anyopaque {
-    _ = allocation_scope;
-    _ = user_data;
-    return c.mi_realloc_aligned(old_allocation, size, alignment);
-}
-
-fn freeCallback(user_data: ?*anyopaque, allocation: ?*anyopaque) callconv(.C) void {
-    _ = user_data;
-    c.mi_free(allocation);
-}
-
 pub fn checkResult(result: c.VkResult) !void {
     last_result = result;
 
@@ -106,14 +79,6 @@ pub fn init(window: glfw.Window, custom_allocator: std.mem.Allocator) !void {
     errdefer deinit();
 
     allocator = custom_allocator;
-    allocation_callbacks = c.VkAllocationCallbacks{
-        .pUserData = null,
-        .pfnAllocation = &allocationCallback,
-        .pfnReallocation = &reallocationCallback,
-        .pfnFree = &freeCallback,
-        .pfnInternalAllocation = null,
-        .pfnInternalFree = null,
-    };
 
     createInstance() catch {
         log_scoped.err("Failed to create instance", .{});
@@ -198,12 +163,12 @@ pub fn deinit() void {
 
     // createGraphicsPipeline()
     if (pipeline_graphics != null) {
-        c.vkDestroyPipeline.?(device, pipeline_graphics, &allocation_callbacks);
+        c.vkDestroyPipeline.?(device, pipeline_graphics, vulkan_allocator);
         pipeline_graphics = null;
     }
 
     if (pipeline_layout != null) {
-        c.vkDestroyPipelineLayout.?(device, pipeline_layout, &allocation_callbacks);
+        c.vkDestroyPipelineLayout.?(device, pipeline_layout, vulkan_allocator);
         pipeline_layout = null;
     }
 
@@ -211,7 +176,7 @@ pub fn deinit() void {
     if (framebuffers != null) {
         for (framebuffers.?) |framebuffer| {
             if (framebuffer != null) {
-                c.vkDestroyFramebuffer.?(device, framebuffer, &allocation_callbacks);
+                c.vkDestroyFramebuffer.?(device, framebuffer, vulkan_allocator);
             }
         }
 
@@ -221,7 +186,7 @@ pub fn deinit() void {
 
     // createRenderPass()
     if (render_pass != null) {
-        c.vkDestroyRenderPass.?(device, render_pass, &allocation_callbacks);
+        c.vkDestroyRenderPass.?(device, render_pass, vulkan_allocator);
         render_pass = null;
     }
 
@@ -229,7 +194,7 @@ pub fn deinit() void {
     if (render_finished_semaphores != null) {
         for (render_finished_semaphores.?) |semaphore| {
             if (semaphore != null) {
-                c.vkDestroySemaphore.?(device, semaphore, &allocation_callbacks);
+                c.vkDestroySemaphore.?(device, semaphore, vulkan_allocator);
             }
         }
 
@@ -240,7 +205,7 @@ pub fn deinit() void {
     if (image_available_semaphores != null) {
         for (image_available_semaphores.?) |semaphore| {
             if (semaphore != null) {
-                c.vkDestroySemaphore.?(device, semaphore, &allocation_callbacks);
+                c.vkDestroySemaphore.?(device, semaphore, vulkan_allocator);
             }
         }
 
@@ -251,7 +216,7 @@ pub fn deinit() void {
     if (frame_inflight_fences != null) {
         for (frame_inflight_fences.?) |fence| {
             if (fence != null) {
-                c.vkDestroyFence.?(device, fence, &allocation_callbacks);
+                c.vkDestroyFence.?(device, fence, vulkan_allocator);
             }
         }
 
@@ -268,7 +233,7 @@ pub fn deinit() void {
 
     // createCommandPool()
     if (command_pool != null) {
-        c.vkDestroyCommandPool.?(device, command_pool, &allocation_callbacks);
+        c.vkDestroyCommandPool.?(device, command_pool, vulkan_allocator);
         command_pool = null;
     }
 
@@ -276,7 +241,7 @@ pub fn deinit() void {
     if (swapchain_image_views != null) {
         for (swapchain_image_views.?) |image_view| {
             if (image_view != null) {
-                c.vkDestroyImageView.?(device, image_view, &allocation_callbacks);
+                c.vkDestroyImageView.?(device, image_view, vulkan_allocator);
             }
         }
 
@@ -290,7 +255,7 @@ pub fn deinit() void {
     }
 
     if (swapchain != null) {
-        c.vkDestroySwapchainKHR.?(device, swapchain, &allocation_callbacks);
+        c.vkDestroySwapchainKHR.?(device, swapchain, vulkan_allocator);
         swapchain = null;
     }
 
@@ -301,7 +266,7 @@ pub fn deinit() void {
 
     // createLogicalDevice()
     if (device != null) {
-        c.vkDestroyDevice.?(device, &allocation_callbacks);
+        c.vkDestroyDevice.?(device, vulkan_allocator);
         device = null;
     }
 
@@ -311,7 +276,7 @@ pub fn deinit() void {
 
     // createSurface()
     if (surface != null) {
-        c.vkDestroySurfaceKHR.?(instance, surface, &allocation_callbacks);
+        c.vkDestroySurfaceKHR.?(instance, surface, vulkan_allocator);
         surface = null;
     }
 
@@ -324,13 +289,13 @@ pub fn deinit() void {
 
     // createDebugCallback()
     if (debug_callback != null) {
-        c.vkDestroyDebugReportCallbackEXT.?(instance, debug_callback, &allocation_callbacks);
+        c.vkDestroyDebugReportCallbackEXT.?(instance, debug_callback, vulkan_allocator);
         debug_callback = null;
     }
 
     // createInstance()
     if (instance != null) {
-        c.vkDestroyInstance.?(instance, &allocation_callbacks);
+        c.vkDestroyInstance.?(instance, vulkan_allocator);
         instance = null;
     }
 
@@ -383,7 +348,7 @@ fn createInstance() !void {
         .ppEnabledExtensionNames = extensions.ptr,
     };
 
-    try checkResult(c.vkCreateInstance.?(&create_info, &allocation_callbacks, &instance));
+    try checkResult(c.vkCreateInstance.?(&create_info, vulkan_allocator, &instance));
     c.volkLoadInstanceOnly(instance);
 }
 
@@ -423,7 +388,7 @@ fn createDebugCallback() !void {
         .pUserData = null,
     };
 
-    try checkResult(c.vkCreateDebugReportCallbackEXT.?(instance, &create_info, &allocation_callbacks, &debug_callback));
+    try checkResult(c.vkCreateDebugReportCallbackEXT.?(instance, &create_info, vulkan_allocator, &debug_callback));
 }
 
 fn selectPhysicalDevice() !void {
@@ -485,7 +450,7 @@ fn selectPhysicalDevice() !void {
 fn createWindowSurface(window: glfw.Window) !void {
     log_scoped.info("Creating window surface...", .{});
 
-    try checkResult(c.glfwCreateWindowSurface(instance, window.handle, &allocation_callbacks, &surface));
+    try checkResult(c.glfwCreateWindowSurface(instance, window.handle, vulkan_allocator, &surface));
     try checkResult(c.vkGetPhysicalDeviceSurfaceCapabilitiesKHR.?(physical_device, surface, &surface_capabilities));
 }
 
@@ -549,7 +514,7 @@ fn createLogicalDevice() !void {
         .pEnabledFeatures = &device_features,
     };
 
-    try checkResult(c.vkCreateDevice.?(physical_device, &device_create_info, &allocation_callbacks, &device));
+    try checkResult(c.vkCreateDevice.?(physical_device, &device_create_info, vulkan_allocator, &device));
     c.volkLoadDevice(device);
 
     c.vkGetDeviceQueue.?(device, queue_graphics_index, 0, &queue_graphics);
@@ -590,7 +555,7 @@ fn createSwapchain(window: glfw.Window) !void {
         .oldSwapchain = null,
     };
 
-    try checkResult(c.vkCreateSwapchainKHR.?(device, &swapchain_create_info, &allocation_callbacks, &swapchain));
+    try checkResult(c.vkCreateSwapchainKHR.?(device, &swapchain_create_info, vulkan_allocator, &swapchain));
 
     var image_count: u32 = 0;
     try checkResult(c.vkGetSwapchainImagesKHR.?(device, swapchain, &image_count, null));
@@ -626,7 +591,7 @@ fn createSwapchain(window: glfw.Window) !void {
             },
         };
 
-        try checkResult(c.vkCreateImageView.?(device, &image_view_create_info, &allocation_callbacks, &swapchain_image_views.?[i]));
+        try checkResult(c.vkCreateImageView.?(device, &image_view_create_info, vulkan_allocator, &swapchain_image_views.?[i]));
     }
 
     max_inflight_frames = image_count;
@@ -642,7 +607,7 @@ fn createCommandPool() !void {
         .queueFamilyIndex = queue_graphics_index,
     };
 
-    try checkResult(c.vkCreateCommandPool.?(device, &command_pool_create_info, &allocation_callbacks, &command_pool));
+    try checkResult(c.vkCreateCommandPool.?(device, &command_pool_create_info, vulkan_allocator, &command_pool));
 }
 
 fn createCommandBuffers() !void {
@@ -681,8 +646,8 @@ fn createRenderSynchronization() !void {
             .flags = 0,
         };
 
-        try checkResult(c.vkCreateSemaphore.?(device, &semaphore_create_info, &allocation_callbacks, &image_available_semaphores.?[i]));
-        try checkResult(c.vkCreateSemaphore.?(device, &semaphore_create_info, &allocation_callbacks, &render_finished_semaphores.?[i]));
+        try checkResult(c.vkCreateSemaphore.?(device, &semaphore_create_info, vulkan_allocator, &image_available_semaphores.?[i]));
+        try checkResult(c.vkCreateSemaphore.?(device, &semaphore_create_info, vulkan_allocator, &render_finished_semaphores.?[i]));
 
         const fence_create_info = c.VkFenceCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -690,7 +655,7 @@ fn createRenderSynchronization() !void {
             .flags = c.VK_FENCE_CREATE_SIGNALED_BIT,
         };
 
-        try checkResult(c.vkCreateFence.?(device, &fence_create_info, &allocation_callbacks, &frame_inflight_fences.?[i]));
+        try checkResult(c.vkCreateFence.?(device, &fence_create_info, vulkan_allocator, &frame_inflight_fences.?[i]));
     }
 }
 
@@ -749,7 +714,7 @@ fn createRenderPass() !void {
         .pDependencies = &subpass_dependency,
     };
 
-    try checkResult(c.vkCreateRenderPass.?(device, &render_pass_create_info, &allocation_callbacks, &render_pass));
+    try checkResult(c.vkCreateRenderPass.?(device, &render_pass_create_info, vulkan_allocator, &render_pass));
 }
 
 fn createFramebuffers() !void {
@@ -777,7 +742,7 @@ fn createFramebuffers() !void {
             .layers = 1,
         };
 
-        try checkResult(c.vkCreateFramebuffer.?(device, &framebuffer_create_info, &allocation_callbacks, &framebuffers.?[i]));
+        try checkResult(c.vkCreateFramebuffer.?(device, &framebuffer_create_info, vulkan_allocator, &framebuffers.?[i]));
     }
 }
 
@@ -803,7 +768,7 @@ fn createShaderModule(path: []const u8) !c.VkShaderModule {
     };
 
     var shader_module: c.VkShaderModule = null;
-    try checkResult(c.vkCreateShaderModule.?(device, &shader_module_create_info, &allocation_callbacks, &shader_module));
+    try checkResult(c.vkCreateShaderModule.?(device, &shader_module_create_info, vulkan_allocator, &shader_module));
     return shader_module;
 }
 
@@ -822,13 +787,13 @@ fn createGraphicsPipeline() !void {
         .pPushConstantRanges = null,
     };
 
-    try checkResult(c.vkCreatePipelineLayout.?(device, &pipeline_layout_create_info, &allocation_callbacks, &pipeline_layout));
+    try checkResult(c.vkCreatePipelineLayout.?(device, &pipeline_layout_create_info, vulkan_allocator, &pipeline_layout));
 
     const vertex_shader_module = try createShaderModule("data/shaders/simple.vert.spv");
-    defer c.vkDestroyShaderModule.?(device, vertex_shader_module, &allocation_callbacks);
+    defer c.vkDestroyShaderModule.?(device, vertex_shader_module, vulkan_allocator);
 
     const fragment_shader_module = try createShaderModule("data/shaders/simple.frag.spv");
-    defer c.vkDestroyShaderModule.?(device, fragment_shader_module, &allocation_callbacks);
+    defer c.vkDestroyShaderModule.?(device, fragment_shader_module, vulkan_allocator);
 
     const vertex_shader_stage_info = c.VkPipelineShaderStageCreateInfo{
         .sType = c.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -968,7 +933,7 @@ fn createGraphicsPipeline() !void {
         .basePipelineIndex = 0,
     };
 
-    try checkResult(c.vkCreateGraphicsPipelines.?(device, null, 1, &graphics_pipeline_create_info, &allocation_callbacks, &pipeline_graphics));
+    try checkResult(c.vkCreateGraphicsPipelines.?(device, null, 1, &graphics_pipeline_create_info, vulkan_allocator, &pipeline_graphics));
 }
 
 fn recordCommandBuffer(command_buffer: c.VkCommandBuffer, image_index: u32) !void {

@@ -5,7 +5,7 @@ const memory = @import("memory.zig");
 const glfw = @import("glfw.zig");
 const vulkan = @import("vulkan.zig");
 
-const allocator: std.mem.Allocator = memory.MimallocAllocator;
+const allocator = memory.default_allocator;
 const log_scoped = std.log.scoped(.Main);
 
 fn formatWindowTitle(buffer: []u8, title: []const u8, fps_count: f32, frame_time: f32) ![:0]u8 {
@@ -21,9 +21,8 @@ pub fn main() !void {
     log_scoped.info("Starting application...", .{});
     log_scoped.debug("Debug logging enabled", .{});
 
-    // Initialize memory allocator
-    try memory.init();
-    defer memory.deinit();
+    // Setup memory
+    memory.setup();
 
     // Initialize GLFW
     try glfw.init();
