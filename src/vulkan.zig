@@ -6,6 +6,15 @@ const glfw = @import("glfw.zig");
 var allocator: std.mem.Allocator = undefined;
 const log_scoped = std.log.scoped(.Vulkan);
 
+const PresentMode = enum(c.VkPresentModeKHR) {
+    Immediate = c.VK_PRESENT_MODE_IMMEDIATE_KHR,
+    Mailbox = c.VK_PRESENT_MODE_MAILBOX_KHR,
+    Fifo = c.VK_PRESENT_MODE_FIFO_KHR,
+    FifoRelaxed = c.VK_PRESENT_MODE_FIFO_RELAXED_KHR,
+};
+
+const present_mode = PresentMode.Fifo;
+
 const validation_layers = &[_][*]const u8{
     "VK_LAYER_KHRONOS_validation",
     "VK_LAYER_KHRONOS_synchronization2",
@@ -577,7 +586,7 @@ fn createSwapchain(window: glfw.Window) !void {
         .pQueueFamilyIndices = null,
         .preTransform = surface_capabilities.currentTransform,
         .compositeAlpha = c.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-        .presentMode = c.VK_PRESENT_MODE_IMMEDIATE_KHR, // TODO Allow toggling Vsync
+        .presentMode = @enumToInt(present_mode),
         .clipped = c.VK_TRUE,
         .oldSwapchain = null,
     };
