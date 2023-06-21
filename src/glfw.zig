@@ -3,7 +3,7 @@ const std = @import("std");
 
 var allocator: std.mem.Allocator = undefined;
 //var allocator_callbacks: c.GLFWallocator = undefined; // TODO Waiting for GLFW 3.4.0
-const log_scoped = std.log.scoped(.GLFW);
+const log = std.log.scoped(.GLFW);
 
 fn allocateCallback(size: usize, user: ?*anyopaque) callconv(.C) ?*anyopaque {
     _ = user;
@@ -21,11 +21,11 @@ fn freeCallback(block: ?*anyopaque, user: ?*anyopaque) callconv(.C) void {
 }
 
 fn errorCallback(error_code: c_int, description: [*c]const u8) callconv(.C) void {
-    log_scoped.err("{s} (Code: {})", .{ description, error_code });
+    log.err("{s} (Code: {})", .{ description, error_code });
 }
 
 pub fn init() !void {
-    log_scoped.info("Initializing...", .{});
+    log.info("Initializing...", .{});
 
     // TODO Waiting for GLFW 3.4.0
     // allocator_callbacks = .{
@@ -37,7 +37,7 @@ pub fn init() !void {
     // c.glfwInitAllocator(&allocator_callbacks);
 
     if (c.glfwInit() == c.GLFW_FALSE) {
-        log_scoped.err("Failed to initialize library", .{});
+        log.err("Failed to initialize library", .{});
         return error.FailedToInitializeGLFWLibrary;
     }
 
@@ -47,13 +47,13 @@ pub fn init() !void {
     var glfwVersionMinor: c_int = undefined;
     var glfwVersionPatch: c_int = undefined;
     c.glfwGetVersion(&glfwVersionMajor, &glfwVersionMinor, &glfwVersionPatch);
-    log_scoped.info("Initialized version {}.{}.{}", .{
+    log.info("Initialized version {}.{}.{}", .{
         glfwVersionMajor, glfwVersionMinor, glfwVersionPatch,
     });
 }
 
 pub fn deinit() void {
-    log_scoped.info("Deinitializing...", .{});
+    log.info("Deinitializing...", .{});
     c.glfwTerminate();
 }
 
@@ -70,42 +70,45 @@ pub const WindowConfig = struct {
 };
 
 pub const Window = struct {
-    handle: *c.GLFWwindow,
+    handle: ?*c.GLFWwindow = null,
 
     pub fn init(config: *const WindowConfig) !Window {
-        log_scoped.info("Creating window...", .{});
+        var self = Window{};
+        errdefer self.deinit();
+
+        try self.createWindow(config);
+        log.info("Created {}x{} window", .{
+            self.getWidth(), self.getHeight(),
+        });
+
+        return self;
+    }
+
+    pub fn deinit(self: *Window) void {
+        if (self.handle != null) {
+            c.glfwDestroyWindow(self.handle);
+        }
+    }
+
+    fn createWindow(self: *Window, config: *const WindowConfig) !void {
+        log.info("Creating window...", .{});
 
         c.glfwWindowHint(c.GLFW_CLIENT_API, c.GLFW_NO_API);
         c.glfwWindowHint(c.GLFW_RESIZABLE, if (config.resizable) c.GLFW_TRUE else c.GLFW_FALSE);
         c.glfwWindowHint(c.GLFW_VISIBLE, if (config.visible) c.GLFW_TRUE else c.GLFW_FALSE);
 
-        const handle = c.glfwCreateWindow(
+        self.handle = c.glfwCreateWindow(
             config.width,
             config.height,
             config.title.ptr,
             null,
             null,
         );
-        if (handle == null) {
-            log_scoped.err("Failed to create window", .{});
+
+        if (self.handle == null) {
+            log.err("Failed to create window", .{});
             return error.FailedToCreateGLFWWindow;
         }
-        errdefer c.glfwDestroyWindow(handle);
-
-        var windowWidth: c_int = undefined;
-        var windowHeight: c_int = undefined;
-        c.glfwGetWindowSize(handle, &windowWidth, &windowHeight);
-        log_scoped.info("Created {}x{} window", .{
-            windowWidth, windowHeight,
-        });
-
-        return Window{
-            .handle = handle.?,
-        };
-    }
-
-    pub fn deinit(self: *Window) void {
-        c.glfwDestroyWindow(self.handle);
     }
 
     pub fn show(self: *Window) void {

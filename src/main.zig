@@ -6,7 +6,7 @@ const glfw = @import("glfw.zig");
 const vulkan = @import("vulkan.zig");
 
 const allocator = memory.default_allocator;
-const log_scoped = std.log.scoped(.Main);
+const log = std.log.scoped(.Main);
 
 fn formatWindowTitle(buffer: []u8, title: []const u8, fps_count: f32, frame_time: f32) ![:0]u8 {
     return try std.fmt.bufPrintZ(buffer, "{s} - {s} - FPS: {d:.0} ({d:.2}ms)", .{
@@ -18,8 +18,8 @@ fn formatWindowTitle(buffer: []u8, title: []const u8, fps_count: f32, frame_time
 }
 
 pub fn main() !void {
-    log_scoped.info("Starting application...", .{});
-    log_scoped.debug("Debug logging enabled", .{});
+    log.info("Starting application...", .{});
+    log.debug("Debug logging enabled", .{});
 
     // Setup memory
     memory.setup();
@@ -45,10 +45,12 @@ pub fn main() !void {
     defer window.deinit();
 
     // Initialize Vulkan
-    try vulkan.init(window, allocator);
-    defer vulkan.deinit();
+    try vulkan.init(&window, allocator);
+    defer vulkan.deinit(allocator);
 
     // Main loop
+    log.info("Starting main loop...", .{});
+
     var timer = try std.time.Timer.start();
     var time_previous_ns = timer.read();
     var time_current_ns = time_previous_ns;
@@ -83,5 +85,5 @@ pub fn main() !void {
         fps_count += 1;
     }
 
-    log_scoped.info("Exiting application...", .{});
+    log.info("Exiting application...", .{});
 }
