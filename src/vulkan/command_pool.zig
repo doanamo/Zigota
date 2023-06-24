@@ -11,7 +11,7 @@ pub const CommandPool = struct {
 
     pub fn init(device: *Device) !CommandPool {
         var self = CommandPool{};
-        errdefer self.deinit();
+        errdefer self.deinit(device);
 
         self.createCommandPool(device) catch {
             log.err("Failed to create command pool", .{});

@@ -91,6 +91,7 @@ pub const Window = struct {
     pub fn init(config: *const WindowConfig, allocator: std.mem.Allocator) !*Window {
         var self = try allocator.create(Window);
         errdefer self.deinit(allocator);
+        self.* = .{};
 
         self.createWindow(config) catch {
             log.err("Failed to create window", .{});
