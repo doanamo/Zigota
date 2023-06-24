@@ -14,12 +14,12 @@ pub const Instance = struct {
 
         self.createInstance(allocator) catch {
             log.err("Failed to create instance", .{});
-            return error.FailedToCreateVulkanInstance;
+            return error.FailedToCreateInstance;
         };
 
         self.createDebugCallback() catch {
             log.err("Failed to create debug callback", .{});
-            return error.FailedToCreateVulkanDebugCallback;
+            return error.FailedToCreateDebugCallback;
         };
 
         return self;

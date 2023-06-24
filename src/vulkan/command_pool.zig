@@ -15,7 +15,7 @@ pub const CommandPool = struct {
 
         self.createCommandPool(device) catch {
             log.err("Failed to create command pool", .{});
-            return error.FailedToCreateVulkanCommandPool;
+            return error.FailedToCreateCommandPool;
         };
 
         return self;

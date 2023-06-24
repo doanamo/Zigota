@@ -37,17 +37,17 @@ pub const Swapchain = struct {
 
         self.createSwapchain(window, surface, device) catch {
             log.err("Failed to create swapchain", .{});
-            return error.FailedToCreateVulkanSwapchain;
+            return error.FailedToCreateSwapchain;
         };
 
         self.createImageViews(device, allocator) catch {
             log.err("Failed to create image views", .{});
-            return error.FailedToCreateVulkanImageViews;
+            return error.FailedToCreateImageViews;
         };
 
         self.createImageSynchronization(device, allocator) catch {
             log.err("Failed to create image synchronization", .{});
-            return error.FailedToCreateVulkanImageSynchronization;
+            return error.FailedToCreateImageSynchronization;
         };
 
         return self;
@@ -66,8 +66,8 @@ pub const Swapchain = struct {
         log.info("Creating swapchain...", .{});
 
         self.extent = c.VkExtent2D{
-            .width = @intCast(u32, window.getWidth()),
-            .height = @intCast(u32, window.getHeight()),
+            .width = window.width,
+            .height = window.height,
         };
 
         self.image_format = c.VK_FORMAT_B8G8R8A8_UNORM;
@@ -174,22 +174,22 @@ pub const Swapchain = struct {
         }
 
         for (0..self.max_inflight_frames) |i| {
-            const semaphore_create_info = c.VkSemaphoreCreateInfo{
+            const semaphore_create_info = &c.VkSemaphoreCreateInfo{
                 .sType = c.VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
                 .pNext = null,
                 .flags = 0,
             };
 
-            try utility.checkResult(c.vkCreateSemaphore.?(device.handle, &semaphore_create_info, memory.vulkan_allocator, &self.image_available_semaphores.?[i]));
-            try utility.checkResult(c.vkCreateSemaphore.?(device.handle, &semaphore_create_info, memory.vulkan_allocator, &self.frame_finished_semaphores.?[i]));
+            try utility.checkResult(c.vkCreateSemaphore.?(device.handle, semaphore_create_info, memory.vulkan_allocator, &self.image_available_semaphores.?[i]));
+            try utility.checkResult(c.vkCreateSemaphore.?(device.handle, semaphore_create_info, memory.vulkan_allocator, &self.frame_finished_semaphores.?[i]));
 
-            const create_info = &c.VkFenceCreateInfo{
+            const fence_create_info = &c.VkFenceCreateInfo{
                 .sType = c.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
                 .pNext = null,
                 .flags = c.VK_FENCE_CREATE_SIGNALED_BIT,
             };
 
-            try utility.checkResult(c.vkCreateFence.?(device.handle, create_info, memory.vulkan_allocator, &self.frame_inflight_fences.?[i]));
+            try utility.checkResult(c.vkCreateFence.?(device.handle, fence_create_info, memory.vulkan_allocator, &self.frame_inflight_fences.?[i]));
         }
     }
 
@@ -225,6 +225,16 @@ pub const Swapchain = struct {
         }
     }
 
+    pub fn recreate(self: *Swapchain, window: *glfw.Window, device: *Device, surface: *Surface, allocator: std.mem.Allocator) !void {
+        log.info("Recreating swapchain...", .{});
+
+        self.destroyImageViews(device, allocator);
+        self.destroySwapchain(device);
+
+        try self.createSwapchain(window, surface, device);
+        try self.createImageViews(device, allocator);
+    }
+
     pub fn acquireNextImage(self: *Swapchain, device: *Device) !struct {
         index: u32,
         available_semaphore: c.VkSemaphore,
@@ -232,21 +242,52 @@ pub const Swapchain = struct {
         inflight_fence: c.VkFence,
     } {
         try utility.checkResult(c.vkWaitForFences.?(device.handle, 1, &self.frame_inflight_fences.?[self.frame_index], c.VK_TRUE, std.math.maxInt(u64)));
-        try utility.checkResult(c.vkResetFences.?(device.handle, 1, &self.frame_inflight_fences.?[self.frame_index]));
 
         var image_index: u32 = 0;
-        try utility.checkResult(c.vkAcquireNextImageKHR.?(device.handle, self.handle, std.math.maxInt(u64), self.image_available_semaphores.?[self.frame_index], null, &image_index));
+        const result = c.vkAcquireNextImageKHR.?(device.handle, self.handle, std.math.maxInt(u64), self.image_available_semaphores.?[self.frame_index], null, &image_index);
 
-        return .{
-            .index = image_index,
-            .available_semaphore = self.image_available_semaphores.?[self.frame_index],
-            .finished_semaphore = self.frame_finished_semaphores.?[self.frame_index],
-            .inflight_fence = self.frame_inflight_fences.?[self.frame_index],
-        };
+        switch (result) {
+            c.VK_SUCCESS, c.VK_SUBOPTIMAL_KHR => {
+                try utility.checkResult(c.vkResetFences.?(device.handle, 1, &self.frame_inflight_fences.?[self.frame_index]));
+
+                return .{
+                    .index = image_index,
+                    .available_semaphore = self.image_available_semaphores.?[self.frame_index],
+                    .finished_semaphore = self.frame_finished_semaphores.?[self.frame_index],
+                    .inflight_fence = self.frame_inflight_fences.?[self.frame_index],
+                };
+            },
+            c.VK_ERROR_OUT_OF_DATE_KHR => {
+                log.warn("Swapchain is out of date", .{});
+                return error.SwapchainOutOfDate;
+            },
+            else => {
+                log.err("Failed to acquire next swapchain image", .{});
+                return error.SwapchainAcquireNextImageFailed;
+            },
+        }
     }
 
     pub fn present(self: *Swapchain, device: *Device, present_info: *const c.VkPresentInfoKHR) !void {
-        try utility.checkResult(c.vkQueuePresentKHR.?(device.queue_graphics, present_info));
-        self.frame_index = (self.frame_index + 1) % self.max_inflight_frames;
+        const result = c.vkQueuePresentKHR.?(device.queue_graphics, present_info);
+
+        switch (result) {
+            c.VK_SUCCESS, c.VK_SUBOPTIMAL_KHR => {
+                self.frame_index = (self.frame_index + 1) % self.max_inflight_frames;
+
+                if (result == c.VK_SUBOPTIMAL_KHR) {
+                    log.warn("Swapchain is suboptimal", .{});
+                    return error.SwapchainSuboptimal;
+                }
+            },
+            c.VK_ERROR_OUT_OF_DATE_KHR => {
+                log.warn("Swapchain is out of date", .{});
+                return error.SwapchainOutOfDate;
+            },
+            else => {
+                log.err("Failed to present swapchain", .{});
+                return error.SwapchainPresentFailed;
+            },
+        }
     }
 };

@@ -16,7 +16,7 @@ pub const PhysicalDevice = struct {
 
         self.selectPhysicalDevice(instance, allocator) catch {
             log.err("Failed to select physical device", .{});
-            return error.FailedToSelectVulkanPhysicalDevice;
+            return error.FailedToSelectPhysicalDevice;
         };
 
         return self;
@@ -36,7 +36,7 @@ pub const PhysicalDevice = struct {
         try utility.checkResult(c.vkEnumeratePhysicalDevices.?(instance.handle, &physical_device_count, null));
         if (physical_device_count == 0) {
             log.err("Failed to find any physical devices", .{});
-            return error.NoAvailableVulkanDevices;
+            return error.NoAvailableDevices;
         }
 
         const physical_devices = try allocator.alloc(c.VkPhysicalDevice, physical_device_count);

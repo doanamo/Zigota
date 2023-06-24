@@ -39,22 +39,22 @@ pub fn init(window: *glfw.Window, allocator: std.mem.Allocator) !void {
 
     createCommandBuffers(allocator) catch {
         log.err("Failed to create command buffers", .{});
-        return error.FailedToCreateVulkanCommandBuffers;
+        return error.FailedToCreateCommandBuffers;
     };
 
     createRenderPass() catch {
         log.err("Failed to create render pass", .{});
-        return error.FailedToCreateVulkanRenderPass;
+        return error.FailedToCreateRenderPass;
     };
 
     createFramebuffers(allocator) catch {
         log.err("Failed to create framebuffers", .{});
-        return error.FailedToCreateVulkanFramebuffers;
+        return error.FailedToCreateFramebuffers;
     };
 
     createGraphicsPipeline(allocator) catch {
         log.err("Failed to create graphics pipeline", .{});
-        return error.FailedToCreateVulkanGraphicsPipeline;
+        return error.FailedToCreateGraphicsPipeline;
     };
 
     try Instance.printVersion();
@@ -75,16 +75,7 @@ pub fn deinit(allocator: std.mem.Allocator) void {
         pipeline_layout = null;
     }
 
-    if (framebuffers != null) {
-        for (framebuffers.?) |framebuffer| {
-            if (framebuffer != null) {
-                c.vkDestroyFramebuffer.?(device.handle, framebuffer, memory.vulkan_allocator);
-            }
-        }
-
-        allocator.free(framebuffers.?);
-        framebuffers = null;
-    }
+    destroyFramebuffers(allocator);
 
     if (render_pass != null) {
         c.vkDestroyRenderPass.?(device.handle, render_pass, memory.vulkan_allocator);
@@ -103,6 +94,16 @@ pub fn deinit(allocator: std.mem.Allocator) void {
     surface.deinit(&instance);
     physical_device.deinit();
     instance.deinit();
+}
+
+pub fn recreateSwapchain(window: *glfw.Window, allocator: std.mem.Allocator) !void {
+    try device.waitIdle();
+
+    destroyFramebuffers(allocator);
+
+    try surface.updateCapabilities(&physical_device);
+    try swapchain.recreate(window, &device, &surface, allocator);
+    try createFramebuffers(allocator);
 }
 
 fn createCommandBuffers(allocator: std.mem.Allocator) !void {
@@ -205,6 +206,19 @@ fn createFramebuffers(allocator: std.mem.Allocator) !void {
         };
 
         try utility.checkResult(c.vkCreateFramebuffer.?(device.handle, create_info, memory.vulkan_allocator, &framebuffers.?[i]));
+    }
+}
+
+fn destroyFramebuffers(allocator: std.mem.Allocator) void {
+    if (framebuffers != null) {
+        for (framebuffers.?) |framebuffer| {
+            if (framebuffer != null) {
+                c.vkDestroyFramebuffer.?(device.handle, framebuffer, memory.vulkan_allocator);
+            }
+        }
+
+        allocator.free(framebuffers.?);
+        framebuffers = null;
     }
 }
 
@@ -430,10 +444,17 @@ fn recordCommandBuffer(command_buffer: c.VkCommandBuffer, image_index: u32) !voi
     try utility.checkResult(c.vkEndCommandBuffer.?(command_buffer));
 }
 
-pub fn render() !void {
-    const image_next = try swapchain.acquireNextImage(&device);
-    const frame_index = swapchain.frame_index;
+pub fn render(window: *glfw.Window, allocator: std.mem.Allocator) !void {
+    const image_next = swapchain.acquireNextImage(&device) catch |err| {
+        if (err == error.SwapchainOutOfDate) {
+            try recreateSwapchain(window, allocator);
+            return;
+        } else {
+            return err;
+        }
+    };
 
+    const frame_index = swapchain.frame_index;
     const command_buffer = command_buffers.?[frame_index];
     try utility.checkResult(c.vkResetCommandBuffer.?(command_buffer, 0));
     try recordCommandBuffer(command_buffer, image_next.index);
@@ -479,5 +500,11 @@ pub fn render() !void {
         .pResults = null,
     };
 
-    try swapchain.present(&device, present_info);
+    swapchain.present(&device, present_info) catch |err| {
+        if (err == error.SwapchainOutOfDate or err == error.SwapchainSuboptimal) {
+            try recreateSwapchain(window, allocator);
+            return;
+        }
+        return err;
+    };
 }

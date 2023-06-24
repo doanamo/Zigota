@@ -34,7 +34,7 @@ pub const ShaderModule = struct {
 
         self.createShaderModule(device, bytes) catch {
             log.err("Failed to create shader module", .{});
-            return error.FailedToCreateVulkanShaderModule;
+            return error.FailedToCreateShaderModule;
         };
 
         return self;

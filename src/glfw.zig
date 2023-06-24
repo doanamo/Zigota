@@ -1,7 +1,6 @@
 const c = @import("c.zig");
 const std = @import("std");
 
-var allocator: std.mem.Allocator = undefined;
 //var allocator_callbacks: c.GLFWallocator = undefined; // TODO Waiting for GLFW 3.4.0
 const log = std.log.scoped(.GLFW);
 
@@ -22,6 +21,19 @@ fn freeCallback(block: ?*anyopaque, user: ?*anyopaque) callconv(.C) void {
 
 fn errorCallback(error_code: c_int, description: [*c]const u8) callconv(.C) void {
     log.err("{s} (Code: {})", .{ description, error_code });
+}
+
+fn framebufferSizeCallback(window: ?*c.GLFWwindow, width: c_int, height: c_int) callconv(.C) void {
+    var self = @ptrCast(*Window, @alignCast(@alignOf(Window), c.glfwGetWindowUserPointer(window)));
+
+    if (width > 0 and height > 0) {
+        self.width = @intCast(u32, width);
+        self.height = @intCast(u32, height);
+        self.resized = !self.minimized;
+        self.minimized = false;
+    } else {
+        self.minimized = true;
+    }
 }
 
 pub fn init() !void {
@@ -71,23 +83,30 @@ pub const WindowConfig = struct {
 
 pub const Window = struct {
     handle: ?*c.GLFWwindow = null,
+    width: u32 = undefined,
+    height: u32 = undefined,
+    resized: bool = false,
+    minimized: bool = false,
 
-    pub fn init(config: *const WindowConfig) !Window {
-        var self = Window{};
-        errdefer self.deinit();
+    pub fn init(config: *const WindowConfig, allocator: std.mem.Allocator) !*Window {
+        var self = try allocator.create(Window);
+        errdefer self.deinit(allocator);
 
-        try self.createWindow(config);
-        log.info("Created {}x{} window", .{
-            self.getWidth(), self.getHeight(),
-        });
+        self.createWindow(config) catch {
+            log.err("Failed to create window", .{});
+            return error.FailedToCreateWindow;
+        };
 
         return self;
     }
 
-    pub fn deinit(self: *Window) void {
+    pub fn deinit(self: *Window, allocator: std.mem.Allocator) void {
         if (self.handle != null) {
             c.glfwDestroyWindow(self.handle);
         }
+
+        allocator.destroy(self);
+        self.* = undefined;
     }
 
     fn createWindow(self: *Window, config: *const WindowConfig) !void {
@@ -106,9 +125,19 @@ pub const Window = struct {
         );
 
         if (self.handle == null) {
-            log.err("Failed to create window", .{});
-            return error.FailedToCreateGLFWWindow;
+            return error.FailedToCreateWindow;
         }
+
+        var width: c_int = undefined;
+        var height: c_int = undefined;
+        c.glfwGetFramebufferSize(self.handle, &width, &height);
+
+        c.glfwSetWindowUserPointer(self.handle, self);
+        _ = c.glfwSetFramebufferSizeCallback(self.handle, framebufferSizeCallback);
+
+        self.width = @intCast(u32, width);
+        self.height = @intCast(u32, height);
+        log.info("Created {}x{} window", .{ self.width, self.height });
     }
 
     pub fn show(self: *Window) void {
@@ -125,17 +154,5 @@ pub const Window = struct {
 
     pub fn shouldClose(self: *const Window) bool {
         return c.glfwWindowShouldClose(self.handle) == c.GLFW_TRUE;
-    }
-
-    pub fn getWidth(self: *const Window) c_int {
-        var width: c_int = undefined;
-        c.glfwGetFramebufferSize(self.handle, &width, null);
-        return width;
-    }
-
-    pub fn getHeight(self: *const Window) c_int {
-        var height: c_int = undefined;
-        c.glfwGetFramebufferSize(self.handle, null, &height);
-        return height;
     }
 };

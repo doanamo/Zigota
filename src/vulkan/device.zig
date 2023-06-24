@@ -19,12 +19,12 @@ pub const Device = struct {
 
         self.selectQueueFamilies(physical_device, surface, allocator) catch {
             log.err("Failed to select queue families", .{});
-            return error.FailedToSelectVulkanQueueFamilies;
+            return error.FailedToSelectQueueFamilies;
         };
 
         self.createLogicalDevice(physical_device) catch {
             log.err("Failed to create logical device", .{});
-            return error.FailedToCreateVulkanLogicalDevice;
+            return error.FailedToCreateLogicalDevice;
         };
 
         return self;
@@ -68,7 +68,7 @@ pub const Device = struct {
 
         if (!found_suitable_queue) {
             log.err("Failed to find suitable queue family", .{});
-            return error.NoSuitableVulkanQueueFamily;
+            return error.NoSuitableQueueFamily;
         }
     }
 

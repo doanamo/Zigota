@@ -18,7 +18,7 @@ pub const Surface = struct {
 
         self.createWindowSurface(window, instance, physical_device) catch {
             log.err("Failed to create window surface", .{});
-            return error.FailedToCreateVulkanWindowSurface;
+            return error.FailedToCreatenWindowSurface;
         };
 
         return self;
@@ -36,6 +36,10 @@ pub const Surface = struct {
         log.info("Creating window surface...", .{});
 
         try utility.checkResult(c.glfwCreateWindowSurface(instance.handle, window.handle, memory.vulkan_allocator, &self.handle));
+        try self.updateCapabilities(physical_device);
+    }
+
+    pub fn updateCapabilities(self: *Surface, physical_device: *PhysicalDevice) !void {
         try utility.checkResult(c.vkGetPhysicalDeviceSurfaceCapabilitiesKHR.?(physical_device.handle, self.handle, &self.capabilities));
     }
 };

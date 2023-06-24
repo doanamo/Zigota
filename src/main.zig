@@ -41,11 +41,11 @@ pub fn main() !void {
         .visible = false,
     };
 
-    var window = try glfw.Window.init(&window_config);
-    defer window.deinit();
+    var window = try glfw.Window.init(&window_config, allocator);
+    defer window.deinit(allocator);
 
     // Initialize Vulkan
-    try vulkan.init(&window, allocator);
+    try vulkan.init(window, allocator);
     defer vulkan.deinit(allocator);
 
     // Main loop
@@ -60,8 +60,7 @@ pub fn main() !void {
 
     window.show();
     while (!window.shouldClose()) {
-        const time_elapsed_ns = @intToFloat(f64, time_current_ns - time_previous_ns);
-        const time_delta = @floatCast(f32, time_elapsed_ns / @intToFloat(f64, std.time.ns_per_s));
+        const time_delta = @floatCast(f32, @intToFloat(f64, time_current_ns - time_previous_ns) / @intToFloat(f64, std.time.ns_per_s));
 
         fps_time += time_delta;
         if (fps_time >= 1.0) {
@@ -78,7 +77,18 @@ pub fn main() !void {
         }
 
         glfw.pollEvents();
-        try vulkan.render();
+
+        if (window.resized) {
+            log.info("Window resized to {}x{}", .{ window.width, window.height });
+            try vulkan.recreateSwapchain(window, allocator);
+            window.resized = false;
+        }
+
+        if (!window.minimized) {
+            try vulkan.render(window, allocator);
+        } else {
+            std.time.sleep(100 * std.time.ns_per_ms);
+        }
 
         time_previous_ns = time_current_ns;
         time_current_ns = timer.read();
