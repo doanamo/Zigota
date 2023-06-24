@@ -60,8 +60,6 @@ pub const PhysicalDevice = struct {
             log.info("Available GPU: {s}", .{std.mem.sliceTo(&physical_device_candidates[i].properties.deviceName, 0)});
         }
 
-        // TODO Fix selection between discrete/integrated GPUs on laptops
-        // Laptops should select integrated when on battery and discrete when on AC
         const DevicePrioritization = struct {
             fn lessThan(_: void, a: PhysicalDeviceCandidate, b: PhysicalDeviceCandidate) bool {
                 return a.properties.deviceType > b.properties.deviceType; // Prefer discrete GPU over integrated GPU
