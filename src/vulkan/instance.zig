@@ -138,6 +138,7 @@ pub const Instance = struct {
         _ = pUserData;
 
         log.debug("{s}", .{pMessage});
+        @breakpoint();
         return c.VK_FALSE;
     }
 };
