@@ -5,6 +5,7 @@ const memory = @import("memory.zig");
 const log = utility.log_scoped;
 
 const Device = @import("device.zig").Device;
+const CommandBuffer = @import("command_buffer.zig").CommandBuffer;
 
 pub const CommandPool = struct {
     handle: c.VkCommandPool = null,
@@ -35,10 +36,14 @@ pub const CommandPool = struct {
         const create_info = &c.VkCommandPoolCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             .pNext = null,
-            .flags = c.VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+            .flags = 0,
             .queueFamilyIndex = device.queue_graphics_index,
         };
 
         try utility.checkResult(c.vkCreateCommandPool.?(device.handle, create_info, memory.vulkan_allocator, &self.handle));
+    }
+
+    pub fn reset(self: *CommandPool, device: *Device) !void {
+        try utility.checkResult(c.vkResetCommandPool.?(device.handle, self.handle, 0));
     }
 };

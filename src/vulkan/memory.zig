@@ -1,6 +1,8 @@
 pub usingnamespace @import("../memory.zig");
 const c = @import("../c.zig");
 
+// TODO Add mimalloc asserts on shutdown errors (leaks, corruptions, etc.)
+
 pub const vulkan_allocator = &c.VkAllocationCallbacks{
     .pUserData = null,
     .pfnAllocation = &allocationCallback,
