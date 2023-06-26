@@ -96,53 +96,6 @@ fn addDependencyMimalloc(builder: *std.build.Builder, exe: *std.build.LibExeObjS
     exe.linkLibrary(mimalloc);
 }
 
-fn addDependencyVulkan(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
-    const vulkan = builder.addStaticLibrary(.{
-        .name = "vulkan",
-        .target = target,
-        .optimize = optimize,
-    });
-
-    var flags = std.ArrayList([]const u8).init(builder.allocator);
-    defer flags.deinit();
-
-    try flags.append("-std=c++11");
-
-    vulkan.addIncludePath(environment.vulkan_include);
-    vulkan.addCSourceFile("src/c/vulkan.cpp", flags.items);
-    vulkan.linkLibCpp();
-
-    exe.addIncludePath(environment.vulkan_include);
-    exe.linkLibrary(vulkan);
-}
-
-fn addDependencyVolk(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
-    const volk = builder.addStaticLibrary(.{
-        .name = "volk",
-        .target = target,
-        .optimize = optimize,
-    });
-
-    var flags = std.ArrayList([]const u8).init(allocator);
-    defer flags.deinit();
-
-    switch (target.getOsTag()) {
-        .windows => {
-            try flags.append("-DVK_USE_PLATFORM_WIN32_KHR");
-            exe.defineCMacroRaw("VK_USE_PLATFORM_WIN32_KHR");
-        },
-        else => unreachable,
-    }
-
-    volk.addIncludePath(environment.vulkan_include);
-    volk.addIncludePath("deps/volk/");
-    volk.addCSourceFile("deps/volk/volk.c", flags.items);
-    volk.linkLibC();
-
-    exe.addIncludePath("deps/volk/");
-    exe.linkLibrary(volk);
-}
-
 fn addDependencyGlfw(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
     const glfw = builder.addStaticLibrary(.{
         .name = "glfw",
@@ -186,6 +139,76 @@ fn addDependencyGlfw(builder: *std.build.Builder, exe: *std.build.LibExeObjStep)
 
     exe.addIncludePath("deps/glfw/include/");
     exe.linkLibrary(glfw);
+}
+
+fn addDependencyVolk(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
+    const volk = builder.addStaticLibrary(.{
+        .name = "volk",
+        .target = target,
+        .optimize = optimize,
+    });
+
+    var flags = std.ArrayList([]const u8).init(allocator);
+    defer flags.deinit();
+
+    switch (target.getOsTag()) {
+        .windows => {
+            try flags.append("-DVK_USE_PLATFORM_WIN32_KHR");
+            exe.defineCMacroRaw("VK_USE_PLATFORM_WIN32_KHR");
+        },
+        else => unreachable,
+    }
+
+    volk.addIncludePath(environment.vulkan_include);
+    volk.addIncludePath("deps/volk/");
+    volk.addCSourceFile("deps/volk/volk.c", flags.items);
+    volk.linkLibC();
+
+    exe.addIncludePath("deps/volk/");
+    exe.linkLibrary(volk);
+}
+
+fn addDependencyVulkan(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
+    const vulkan = builder.addStaticLibrary(.{
+        .name = "vulkan",
+        .target = target,
+        .optimize = optimize,
+    });
+
+    var flags = std.ArrayList([]const u8).init(builder.allocator);
+    defer flags.deinit();
+
+    try flags.append("-std=c++11");
+
+    vulkan.addIncludePath(environment.vulkan_include);
+    vulkan.addCSourceFile("src/c/vulkan.cpp", flags.items);
+    vulkan.linkLibCpp();
+
+    exe.addIncludePath(environment.vulkan_include);
+    exe.linkLibrary(vulkan);
+}
+
+fn addDependencyVma(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
+    const vma = builder.addStaticLibrary(.{
+        .name = "vma",
+        .target = target,
+        .optimize = optimize,
+    });
+
+    var flags = std.ArrayList([]const u8).init(allocator);
+    defer flags.deinit();
+
+    try flags.append("-std=c++14");
+    try flags.append("-DVMA_STATIC_VULKAN_FUNCTIONS=0");
+    try flags.append("-DVMA_DYNAMIC_VULKAN_FUNCTIONS=1");
+
+    vma.addIncludePath(environment.vulkan_include);
+    vma.addIncludePath("deps/vma/src/");
+    vma.addCSourceFile("src/c/vma.cpp", flags.items);
+    vma.linkLibCpp();
+
+    exe.addIncludePath("deps/vma/src/");
+    exe.linkLibrary(vma);
 }
 
 fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
@@ -236,9 +259,10 @@ fn createGame(builder: *std.build.Builder) !void {
 
     game.addIncludePath("src/c/");
     try addDependencyMimalloc(builder, game);
+    try addDependencyGlfw(builder, game);
     try addDependencyVolk(builder, game);
     try addDependencyVulkan(builder, game);
-    try addDependencyGlfw(builder, game);
+    try addDependencyVma(builder, game);
     try compileShaders(builder, game);
     builder.installArtifact(game);
 

@@ -24,7 +24,7 @@ pub fn main() !void {
     log.debug("Debug logging enabled", .{});
 
     // Setup memory
-    memory.setup();
+    memory.setupMimalloc();
 
     // Initialize GLFW
     try glfw.init();

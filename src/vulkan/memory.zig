@@ -3,14 +3,14 @@ const c = @import("../c.zig");
 
 pub const vulkan_allocator = &c.VkAllocationCallbacks{
     .pUserData = null,
-    .pfnAllocation = &allocationCallback,
-    .pfnReallocation = &reallocationCallback,
-    .pfnFree = &freeCallback,
+    .pfnAllocation = &vulkanAllocationCallback,
+    .pfnReallocation = &vulkanReallocationCallback,
+    .pfnFree = &vulkanFreeCallback,
     .pfnInternalAllocation = null,
     .pfnInternalFree = null,
 };
 
-fn allocationCallback(
+fn vulkanAllocationCallback(
     user_data: ?*anyopaque,
     size: usize,
     alignment: usize,
@@ -21,7 +21,7 @@ fn allocationCallback(
     return c.mi_malloc_aligned(size, alignment);
 }
 
-fn reallocationCallback(
+fn vulkanReallocationCallback(
     user_data: ?*anyopaque,
     old_allocation: ?*anyopaque,
     size: usize,
@@ -33,7 +33,20 @@ fn reallocationCallback(
     return c.mi_realloc_aligned(old_allocation, size, alignment);
 }
 
-fn freeCallback(user_data: ?*anyopaque, allocation: ?*anyopaque) callconv(.C) void {
+fn vulkanFreeCallback(user_data: ?*anyopaque, allocation: ?*anyopaque) callconv(.C) void {
     _ = user_data;
     c.mi_free(allocation);
+}
+
+pub fn setupVma() void {
+    c.vmaAlignedMalloc = &vmaAlignedMalloc;
+    c.vmaFree = &vmaFree;
+}
+
+fn vmaAlignedMalloc(size: usize, alignment: usize) callconv(.C) ?*anyopaque {
+    return c.mi_malloc_aligned(size, alignment);
+}
+
+fn vmaFree(ptr: ?*anyopaque) callconv(.C) void {
+    c.mi_free(ptr);
 }

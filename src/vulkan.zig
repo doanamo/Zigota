@@ -33,6 +33,8 @@ pub fn init(window: *glfw.Window, allocator_: std.mem.Allocator) !void {
     log.info("Initializing...", .{});
     errdefer deinit();
 
+    memory.setupVma();
+
     allocator = allocator_;
     instance = try Instance.init(allocator);
     physical_device = try PhysicalDevice.init(&instance, allocator);
