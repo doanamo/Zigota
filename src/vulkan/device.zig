@@ -10,10 +10,10 @@ const Surface = @import("surface.zig").Surface;
 
 pub const Device = struct {
     handle: c.VkDevice = null,
-    queue_graphics: c.VkQueue = null,
+    queue_graphics: c.VkQueue = undefined,
     queue_graphics_index: u32 = undefined,
 
-    pub fn init(physical_device: *PhysicalDevice, surface: *Surface, allocator: std.mem.Allocator) !Device {
+    pub fn init(physical_device: *const PhysicalDevice, surface: *Surface, allocator: std.mem.Allocator) !Device {
         var self = Device{};
         errdefer self.deinit();
 
@@ -31,17 +31,13 @@ pub const Device = struct {
     }
 
     pub fn deinit(self: *Device) void {
-        // No need to destroy queues that are owned by physical device
-        if (self.handle != null) {
-            c.vkDestroyDevice.?(self.handle, memory.vulkan_allocator);
-        }
-
+        // Queues are owned by logical device
+        self.destroyLogicalDevice();
         self.* = undefined;
     }
 
-    fn selectQueueFamilies(self: *Device, physical_device: *PhysicalDevice, surface: *Surface, allocator: std.mem.Allocator) !void {
-        // Simplified queue family selection
-        // Select first queue that supports both graphics and presentation
+    fn selectQueueFamilies(self: *Device, physical_device: *const PhysicalDevice, surface: *const Surface, allocator: std.mem.Allocator) !void {
+        // Simplified queue family selection - select one that supports both graphics and presentation
         log.info("Selecting queue families...", .{});
 
         var queue_family_count: u32 = 0;
@@ -49,7 +45,6 @@ pub const Device = struct {
 
         const queue_families = try allocator.alloc(c.VkQueueFamilyProperties, queue_family_count);
         defer allocator.free(queue_families);
-
         c.vkGetPhysicalDeviceQueueFamilyProperties.?(physical_device.handle, &queue_family_count, queue_families.ptr);
 
         var found_suitable_queue = false;
@@ -72,7 +67,7 @@ pub const Device = struct {
         }
     }
 
-    fn createLogicalDevice(self: *Device, physical_device: *PhysicalDevice) !void {
+    fn createLogicalDevice(self: *Device, physical_device: *const PhysicalDevice) !void {
         log.info("Creating logical device...", .{});
 
         const queue_priorities = [1]f32{1.0};
@@ -108,11 +103,14 @@ pub const Device = struct {
         c.vkGetDeviceQueue.?(self.handle, self.queue_graphics_index, 0, &self.queue_graphics);
     }
 
-    pub fn waitIdle(self: *Device) !void {
-        // Null check needed because this function is called from deinit
+    fn destroyLogicalDevice(self: *Device) void {
         if (self.handle != null) {
-            try utility.checkResult(c.vkDeviceWaitIdle.?(self.handle));
+            c.vkDestroyDevice.?(self.handle, memory.vulkan_allocator);
         }
+    }
+
+    pub fn waitIdle(self: *Device) void {
+        utility.checkResult(c.vkDeviceWaitIdle.?(self.handle)) catch unreachable;
     }
 
     pub fn submit(self: *Device, submit_count: u32, submit_info: *const c.VkSubmitInfo, fence: c.VkFence) !void {

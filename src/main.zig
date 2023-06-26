@@ -46,7 +46,7 @@ pub fn main() !void {
 
     // Initialize Vulkan
     try vulkan.init(window, allocator);
-    defer vulkan.deinit(allocator);
+    defer vulkan.deinit();
 
     // Main loop
     log.info("Starting main loop...", .{});
@@ -80,12 +80,12 @@ pub fn main() !void {
 
         if (window.resized) {
             log.info("Window resized to {}x{}", .{ window.width, window.height });
-            try vulkan.recreateSwapchain(window, allocator);
+            try vulkan.recreateSwapchain();
             window.resized = false;
         }
 
         if (!window.minimized) {
-            try vulkan.render(window, allocator);
+            try vulkan.render();
         } else {
             std.time.sleep(100 * std.time.ns_per_ms);
         }

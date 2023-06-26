@@ -19,33 +19,41 @@ pub const Swapchain = struct {
     const present_mode = PresentMode.Immediate;
 
     handle: c.VkSwapchainKHR = null,
-    images: ?[]c.VkImage = null,
-    image_views: ?[]c.VkImageView = null,
+    window: *glfw.Window = undefined,
+    surface: *Surface = undefined,
+    device: *Device = undefined,
+    allocator: std.mem.Allocator = undefined,
+
+    image_views: std.ArrayListUnmanaged(c.VkImageView) = .{},
     image_format: c.VkFormat = undefined,
     color_space: c.VkColorSpaceKHR = undefined,
     extent: c.VkExtent2D = undefined,
 
     max_inflight_frames: u32 = undefined,
-    image_available_semaphores: ?[]c.VkSemaphore = null,
-    frame_finished_semaphores: ?[]c.VkSemaphore = null,
-    frame_inflight_fences: ?[]c.VkFence = null,
+    image_available_semaphores: std.ArrayListUnmanaged(c.VkSemaphore) = .{},
+    frame_finished_semaphores: std.ArrayListUnmanaged(c.VkSemaphore) = .{},
+    frame_inflight_fences: std.ArrayListUnmanaged(c.VkFence) = .{},
     frame_index: u32 = 0,
 
     pub fn init(window: *glfw.Window, surface: *Surface, device: *Device, allocator: std.mem.Allocator) !Swapchain {
         var self = Swapchain{};
-        errdefer self.deinit(device, allocator);
+        self.device = device;
+        self.window = window;
+        self.surface = surface;
+        self.allocator = allocator;
+        errdefer self.deinit();
 
-        self.createSwapchain(window, surface, device) catch {
+        self.createSwapchain() catch {
             log.err("Failed to create swapchain", .{});
             return error.FailedToCreateSwapchain;
         };
 
-        self.createImageViews(device, allocator) catch {
+        self.createImageViews() catch {
             log.err("Failed to create image views", .{});
             return error.FailedToCreateImageViews;
         };
 
-        self.createImageSynchronization(device, allocator) catch {
+        self.createImageSynchronization() catch {
             log.err("Failed to create image synchronization", .{});
             return error.FailedToCreateImageSynchronization;
         };
@@ -53,21 +61,22 @@ pub const Swapchain = struct {
         return self;
     }
 
-    pub fn deinit(self: *Swapchain, device: *Device, allocator: std.mem.Allocator) void {
-        self.destroyImageSynchronization(device, allocator);
-        self.destroyImageViews(device, allocator);
-        self.destroySwapchain(device);
+    pub fn deinit(self: *Swapchain) void {
+        self.destroyImageSynchronization();
+        self.destroyImageViews();
+        self.destroySwapchain();
         self.* = undefined;
     }
 
-    fn createSwapchain(self: *Swapchain, window: *glfw.Window, surface: *Surface, device: *Device) !void {
+    fn createSwapchain(self: *Swapchain) !void {
         // Simplified surface format and present mode selection
         // Hardcoded swapchain preferences with most common support across most platforms
         log.info("Creating swapchain...", .{});
+        errdefer self.destroySwapchain();
 
         self.extent = c.VkExtent2D{
-            .width = window.width,
-            .height = window.height,
+            .width = self.window.width,
+            .height = self.window.height,
         };
 
         self.image_format = c.VK_FORMAT_B8G8R8A8_UNORM;
@@ -77,7 +86,7 @@ pub const Swapchain = struct {
             .sType = c.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
             .pNext = null,
             .flags = 0,
-            .surface = surface.handle,
+            .surface = self.surface.handle,
             .minImageCount = 2,
             .imageFormat = self.image_format,
             .imageColorSpace = self.color_space,
@@ -87,35 +96,37 @@ pub const Swapchain = struct {
             .imageSharingMode = c.VK_SHARING_MODE_EXCLUSIVE,
             .queueFamilyIndexCount = 0,
             .pQueueFamilyIndices = null,
-            .preTransform = surface.capabilities.currentTransform,
+            .preTransform = self.surface.capabilities.currentTransform,
             .compositeAlpha = c.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
             .presentMode = @enumToInt(present_mode),
             .clipped = c.VK_TRUE,
             .oldSwapchain = null,
         };
 
-        try utility.checkResult(c.vkCreateSwapchainKHR.?(device.handle, create_info, memory.vulkan_allocator, &self.handle));
+        try utility.checkResult(c.vkCreateSwapchainKHR.?(self.device.handle, create_info, memory.vulkan_allocator, &self.handle));
     }
 
-    fn destroySwapchain(self: *Swapchain, device: *Device) void {
+    fn destroySwapchain(self: *Swapchain) void {
         if (self.handle != null) {
-            c.vkDestroySwapchainKHR.?(device.handle, self.handle, memory.vulkan_allocator);
+            c.vkDestroySwapchainKHR.?(self.device.handle, self.handle, memory.vulkan_allocator);
+            self.handle = null;
         }
     }
 
-    fn createImageViews(self: *Swapchain, device: *Device, allocator: std.mem.Allocator) !void {
+    fn createImageViews(self: *Swapchain) !void {
+        log.info("Creating swapchain image views...", .{});
+        errdefer self.destroyImageViews();
+
         var image_count: u32 = 0;
-        try utility.checkResult(c.vkGetSwapchainImagesKHR.?(device.handle, self.handle, &image_count, null));
+        try utility.checkResult(c.vkGetSwapchainImagesKHR.?(self.device.handle, self.handle, &image_count, null));
+        self.max_inflight_frames = image_count;
 
-        self.images = try allocator.alloc(c.VkImage, image_count);
-        try utility.checkResult(c.vkGetSwapchainImagesKHR.?(device.handle, self.handle, &image_count, self.images.?.ptr));
+        const images = try self.allocator.alloc(c.VkImage, image_count);
+        defer self.allocator.free(images);
+        try utility.checkResult(c.vkGetSwapchainImagesKHR.?(self.device.handle, self.handle, &image_count, images.ptr));
 
-        self.image_views = try allocator.alloc(c.VkImageView, image_count);
-        for (self.image_views.?) |*image| {
-            image.* = null;
-        }
-
-        for (self.images.?, 0..) |image, i| {
+        try self.image_views.ensureTotalCapacityPrecise(self.allocator, image_count);
+        for (images) |image| {
             const create_info = &c.VkImageViewCreateInfo{
                 .sType = c.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                 .pNext = null,
@@ -138,50 +149,42 @@ pub const Swapchain = struct {
                 },
             };
 
-            try utility.checkResult(c.vkCreateImageView.?(device.handle, create_info, memory.vulkan_allocator, &self.image_views.?[i]));
-        }
-
-        self.max_inflight_frames = image_count;
-    }
-
-    fn destroyImageViews(self: *Swapchain, device: *Device, allocator: std.mem.Allocator) void {
-        if (self.image_views != null) {
-            for (self.image_views.?) |image_view| {
-                if (image_view != null) {
-                    c.vkDestroyImageView.?(device.handle, image_view, memory.vulkan_allocator);
-                }
-            }
-
-            allocator.free(self.image_views.?);
-        }
-
-        if (self.images != null) {
-            allocator.free(self.images.?);
+            var image_view: c.VkImageView = null;
+            try utility.checkResult(c.vkCreateImageView.?(self.device.handle, create_info, memory.vulkan_allocator, &image_view));
+            try self.image_views.append(self.allocator, image_view);
         }
     }
 
-    fn createImageSynchronization(self: *Swapchain, device: *Device, allocator: std.mem.Allocator) !void {
-        log.info("Creating image synchronization...", .{});
-
-        self.image_available_semaphores = try allocator.alloc(c.VkSemaphore, self.max_inflight_frames);
-        self.frame_finished_semaphores = try allocator.alloc(c.VkSemaphore, self.max_inflight_frames);
-        self.frame_inflight_fences = try allocator.alloc(c.VkFence, self.max_inflight_frames);
-
-        for (0..self.max_inflight_frames) |i| {
-            self.image_available_semaphores.?[i] = null;
-            self.frame_finished_semaphores.?[i] = null;
-            self.frame_inflight_fences.?[i] = null;
+    fn destroyImageViews(self: *Swapchain) void {
+        for (self.image_views.items) |image_view| {
+            c.vkDestroyImageView.?(self.device.handle, image_view, memory.vulkan_allocator);
         }
 
-        for (0..self.max_inflight_frames) |i| {
+        self.image_views.deinit(self.allocator);
+        self.image_views = .{};
+    }
+
+    fn createImageSynchronization(self: *Swapchain) !void {
+        log.info("Creating swapchain image synchronization...", .{});
+
+        try self.image_available_semaphores.ensureTotalCapacityPrecise(self.allocator, self.max_inflight_frames);
+        try self.frame_finished_semaphores.ensureTotalCapacityPrecise(self.allocator, self.max_inflight_frames);
+        try self.frame_inflight_fences.ensureTotalCapacityPrecise(self.allocator, self.max_inflight_frames);
+
+        for (0..self.max_inflight_frames) |_| {
             const semaphore_create_info = &c.VkSemaphoreCreateInfo{
                 .sType = c.VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
                 .pNext = null,
                 .flags = 0,
             };
 
-            try utility.checkResult(c.vkCreateSemaphore.?(device.handle, semaphore_create_info, memory.vulkan_allocator, &self.image_available_semaphores.?[i]));
-            try utility.checkResult(c.vkCreateSemaphore.?(device.handle, semaphore_create_info, memory.vulkan_allocator, &self.frame_finished_semaphores.?[i]));
+            var image_available_semaphore: c.VkSemaphore = null;
+            try utility.checkResult(c.vkCreateSemaphore.?(self.device.handle, semaphore_create_info, memory.vulkan_allocator, &image_available_semaphore));
+            try self.image_available_semaphores.append(self.allocator, image_available_semaphore);
+
+            var frame_finished_semaphore: c.VkSemaphore = null;
+            try utility.checkResult(c.vkCreateSemaphore.?(self.device.handle, semaphore_create_info, memory.vulkan_allocator, &frame_finished_semaphore));
+            try self.frame_finished_semaphores.append(self.allocator, frame_finished_semaphore);
 
             const fence_create_info = &c.VkFenceCreateInfo{
                 .sType = c.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -189,72 +192,61 @@ pub const Swapchain = struct {
                 .flags = c.VK_FENCE_CREATE_SIGNALED_BIT,
             };
 
-            try utility.checkResult(c.vkCreateFence.?(device.handle, fence_create_info, memory.vulkan_allocator, &self.frame_inflight_fences.?[i]));
+            var frame_inflight_fence: c.VkFence = null;
+            try utility.checkResult(c.vkCreateFence.?(self.device.handle, fence_create_info, memory.vulkan_allocator, &frame_inflight_fence));
+            try self.frame_inflight_fences.append(self.allocator, frame_inflight_fence);
         }
     }
 
-    fn destroyImageSynchronization(self: *Swapchain, device: *Device, allocator: std.mem.Allocator) void {
-        if (self.image_available_semaphores != null) {
-            for (self.image_available_semaphores.?) |semaphore| {
-                if (semaphore != null) {
-                    c.vkDestroySemaphore.?(device.handle, semaphore, memory.vulkan_allocator);
-                }
-            }
-
-            allocator.free(self.image_available_semaphores.?);
+    fn destroyImageSynchronization(self: *Swapchain) void {
+        for (self.image_available_semaphores.items) |semaphore| {
+            c.vkDestroySemaphore.?(self.device.handle, semaphore, memory.vulkan_allocator);
         }
 
-        if (self.frame_finished_semaphores != null) {
-            for (self.frame_finished_semaphores.?) |semaphore| {
-                if (semaphore != null) {
-                    c.vkDestroySemaphore.?(device.handle, semaphore, memory.vulkan_allocator);
-                }
-            }
-
-            allocator.free(self.frame_finished_semaphores.?);
+        for (self.frame_finished_semaphores.items) |semaphore| {
+            c.vkDestroySemaphore.?(self.device.handle, semaphore, memory.vulkan_allocator);
         }
 
-        if (self.frame_inflight_fences != null) {
-            for (self.frame_inflight_fences.?) |fence| {
-                if (fence != null) {
-                    c.vkDestroyFence.?(device.handle, fence, memory.vulkan_allocator);
-                }
-            }
-
-            allocator.free(self.frame_inflight_fences.?);
+        for (self.frame_inflight_fences.items) |fence| {
+            c.vkDestroyFence.?(self.device.handle, fence, memory.vulkan_allocator);
         }
+
+        self.image_available_semaphores.deinit(self.allocator);
+        self.frame_finished_semaphores.deinit(self.allocator);
+        self.frame_inflight_fences.deinit(self.allocator);
     }
 
-    pub fn recreate(self: *Swapchain, window: *glfw.Window, device: *Device, surface: *Surface, allocator: std.mem.Allocator) !void {
+    pub fn recreate(self: *Swapchain) !void {
         log.info("Recreating swapchain...", .{});
 
-        self.destroyImageViews(device, allocator);
-        self.destroySwapchain(device);
+        self.destroyImageViews();
+        self.destroySwapchain();
 
-        try self.createSwapchain(window, surface, device);
-        try self.createImageViews(device, allocator);
+        try self.surface.updateCapabilities();
+        try self.createSwapchain();
+        try self.createImageViews();
     }
 
-    pub fn acquireNextImage(self: *Swapchain, device: *Device) !struct {
+    pub fn acquireNextImage(self: *Swapchain) !struct {
         index: u32,
         available_semaphore: c.VkSemaphore,
         finished_semaphore: c.VkSemaphore,
         inflight_fence: c.VkFence,
     } {
-        try utility.checkResult(c.vkWaitForFences.?(device.handle, 1, &self.frame_inflight_fences.?[self.frame_index], c.VK_TRUE, std.math.maxInt(u64)));
+        try utility.checkResult(c.vkWaitForFences.?(self.device.handle, 1, &self.frame_inflight_fences.items[self.frame_index], c.VK_TRUE, std.math.maxInt(u64)));
 
         var image_index: u32 = 0;
-        const result = c.vkAcquireNextImageKHR.?(device.handle, self.handle, std.math.maxInt(u64), self.image_available_semaphores.?[self.frame_index], null, &image_index);
+        const result = c.vkAcquireNextImageKHR.?(self.device.handle, self.handle, std.math.maxInt(u64), self.image_available_semaphores.items[self.frame_index], null, &image_index);
 
         switch (result) {
             c.VK_SUCCESS, c.VK_SUBOPTIMAL_KHR => {
-                try utility.checkResult(c.vkResetFences.?(device.handle, 1, &self.frame_inflight_fences.?[self.frame_index]));
+                try utility.checkResult(c.vkResetFences.?(self.device.handle, 1, &self.frame_inflight_fences.items[self.frame_index]));
 
                 return .{
                     .index = image_index,
-                    .available_semaphore = self.image_available_semaphores.?[self.frame_index],
-                    .finished_semaphore = self.frame_finished_semaphores.?[self.frame_index],
-                    .inflight_fence = self.frame_inflight_fences.?[self.frame_index],
+                    .available_semaphore = self.image_available_semaphores.items[self.frame_index],
+                    .finished_semaphore = self.frame_finished_semaphores.items[self.frame_index],
+                    .inflight_fence = self.frame_inflight_fences.items[self.frame_index],
                 };
             },
             c.VK_ERROR_OUT_OF_DATE_KHR => {
@@ -268,8 +260,8 @@ pub const Swapchain = struct {
         }
     }
 
-    pub fn present(self: *Swapchain, device: *Device, present_info: *const c.VkPresentInfoKHR) !void {
-        const result = c.vkQueuePresentKHR.?(device.queue_graphics, present_info);
+    pub fn present(self: *Swapchain, present_info: *const c.VkPresentInfoKHR) !void {
+        const result = c.vkQueuePresentKHR.?(self.device.queue_graphics, present_info);
 
         switch (result) {
             c.VK_SUCCESS, c.VK_SUBOPTIMAL_KHR => {

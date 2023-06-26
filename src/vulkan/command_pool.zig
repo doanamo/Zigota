@@ -9,29 +9,12 @@ const CommandBuffer = @import("command_buffer.zig").CommandBuffer;
 
 pub const CommandPool = struct {
     handle: c.VkCommandPool = null,
+    device: *Device = undefined,
 
     pub fn init(device: *Device) !CommandPool {
         var self = CommandPool{};
-        errdefer self.deinit(device);
-
-        self.createCommandPool(device) catch {
-            log.err("Failed to create command pool", .{});
-            return error.FailedToCreateCommandPool;
-        };
-
-        return self;
-    }
-
-    pub fn deinit(self: *CommandPool, device: *Device) void {
-        if (self.handle != null) {
-            c.vkDestroyCommandPool.?(device.handle, self.handle, memory.vulkan_allocator);
-        }
-
-        self.* = undefined;
-    }
-
-    fn createCommandPool(self: *CommandPool, device: *Device) !void {
-        log.info("Creating command pool...", .{});
+        self.device = device;
+        errdefer self.deinit();
 
         const create_info = &c.VkCommandPoolCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -40,10 +23,22 @@ pub const CommandPool = struct {
             .queueFamilyIndex = device.queue_graphics_index,
         };
 
-        try utility.checkResult(c.vkCreateCommandPool.?(device.handle, create_info, memory.vulkan_allocator, &self.handle));
+        utility.checkResult(c.vkCreateCommandPool.?(device.handle, create_info, memory.vulkan_allocator, &self.handle)) catch {
+            log.err("Failed to create command pool", .{});
+            return error.FailedToCreateCommandPool;
+        };
+
+        return self;
     }
 
-    pub fn reset(self: *CommandPool, device: *Device) !void {
-        try utility.checkResult(c.vkResetCommandPool.?(device.handle, self.handle, 0));
+    pub fn deinit(self: *CommandPool) void {
+        if (self.handle != null) {
+            c.vkDestroyCommandPool.?(self.device.handle, self.handle, memory.vulkan_allocator);
+        }
+        self.* = undefined;
+    }
+
+    pub fn reset(self: *CommandPool) !void {
+        try utility.checkResult(c.vkResetCommandPool.?(self.device.handle, self.handle, 0));
     }
 };

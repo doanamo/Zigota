@@ -6,7 +6,7 @@ const log = utility.log_scoped;
 const Instance = @import("instance.zig").Instance;
 
 pub const PhysicalDevice = struct {
-    handle: c.VkPhysicalDevice = null,
+    handle: c.VkPhysicalDevice = undefined,
     properties: c.VkPhysicalDeviceProperties = undefined,
     features: c.VkPhysicalDeviceFeatures = undefined,
 
@@ -23,13 +23,12 @@ pub const PhysicalDevice = struct {
     }
 
     pub fn deinit(self: *PhysicalDevice) void {
-        // No need to free physial device handle that is owned by instance
+        // Physial device is owned by instance
         self.* = undefined;
     }
 
-    fn selectPhysicalDevice(self: *PhysicalDevice, instance: *Instance, allocator: std.mem.Allocator) !void {
-        // Simplified physical device selection
-        // Select first physical device that is dedictated GPU
+    fn selectPhysicalDevice(self: *PhysicalDevice, instance: *const Instance, allocator: std.mem.Allocator) !void {
+        // Simplified physical device selection - select first that is dedictated GPU
         log.info("Selecting physical device...", .{});
 
         var physical_device_count: u32 = 0;
@@ -41,7 +40,6 @@ pub const PhysicalDevice = struct {
 
         const physical_devices = try allocator.alloc(c.VkPhysicalDevice, physical_device_count);
         defer allocator.free(physical_devices);
-
         try utility.checkResult(c.vkEnumeratePhysicalDevices.?(instance.handle, &physical_device_count, physical_devices.ptr));
 
         const PhysicalDeviceCandidate = struct {

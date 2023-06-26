@@ -30,7 +30,7 @@ pub const ShaderModule = struct {
 
     pub fn init(device: *Device, bytes: ByteCode) !ShaderModule {
         var self = ShaderModule{};
-        errdefer self.deinit();
+        errdefer self.deinit(device);
 
         self.createShaderModule(device, bytes) catch {
             log.err("Failed to create shader module", .{});
@@ -41,10 +41,7 @@ pub const ShaderModule = struct {
     }
 
     pub fn deinit(self: *ShaderModule, device: *Device) void {
-        if (self.handle != null) {
-            c.vkDestroyShaderModule.?(device.handle, self.handle, memory.vulkan_allocator);
-        }
-
+        self.destroyShaderModule(device);
         self.* = undefined;
     }
 
@@ -60,5 +57,11 @@ pub const ShaderModule = struct {
         };
 
         try utility.checkResult(c.vkCreateShaderModule.?(device.handle, create_info, memory.vulkan_allocator, &self.handle));
+    }
+
+    fn destroyShaderModule(self: *ShaderModule, device: *Device) void {
+        if (self.handle != null) {
+            c.vkDestroyShaderModule.?(device.handle, self.handle, memory.vulkan_allocator);
+        }
     }
 };

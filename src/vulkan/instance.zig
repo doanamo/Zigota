@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtins = @import("builtins");
 const c = @import("../c.zig");
 const utility = @import("utility.zig");
 const memory = @import("memory.zig");
@@ -6,7 +7,7 @@ const log = utility.log_scoped;
 
 pub const Instance = struct {
     handle: c.VkInstance = null,
-    debug_callback: c.VkDebugReportCallbackEXT = null,
+    debug_callback: if (std.debug.runtime_safety) c.VkDebugReportCallbackEXT else void = undefined,
 
     pub fn init(allocator: std.mem.Allocator) !Instance {
         var self = Instance{};
@@ -26,14 +27,8 @@ pub const Instance = struct {
     }
 
     pub fn deinit(self: *Instance) void {
-        if (self.debug_callback != null) {
-            c.vkDestroyDebugReportCallbackEXT.?(self.handle, self.debug_callback, memory.vulkan_allocator);
-        }
-
-        if (self.handle != null) {
-            c.vkDestroyInstance.?(self.handle, memory.vulkan_allocator);
-        }
-
+        self.destroyDebugCallback();
+        self.destroyInstance();
         self.* = undefined;
     }
 
@@ -61,8 +56,8 @@ pub const Instance = struct {
             .pNext = null,
             .flags = 0,
             .pApplicationInfo = application_info,
-            .enabledLayerCount = if (comptime std.debug.runtime_safety) @intCast(u32, validation_layers.len) else 0,
-            .ppEnabledLayerNames = if (comptime std.debug.runtime_safety) &validation_layers else null,
+            .enabledLayerCount = if (std.debug.runtime_safety) @intCast(u32, validation_layers.len) else 0,
+            .ppEnabledLayerNames = if (std.debug.runtime_safety) &validation_layers else null,
             .enabledExtensionCount = @intCast(u32, extensions.len),
             .ppEnabledExtensionNames = extensions.ptr,
         };
@@ -71,8 +66,14 @@ pub const Instance = struct {
         c.volkLoadInstanceOnly(self.handle);
     }
 
+    fn destroyInstance(self: *Instance) void {
+        if (self.handle != null) {
+            c.vkDestroyInstance.?(self.handle, memory.vulkan_allocator);
+        }
+    }
+
     fn createDebugCallback(self: *Instance) !void {
-        if (comptime !std.debug.runtime_safety)
+        if (!std.debug.runtime_safety)
             return;
 
         log.info("Creating debug callback...", .{});
@@ -96,6 +97,15 @@ pub const Instance = struct {
             c.VK_VERSION_MINOR(version),
             c.VK_VERSION_PATCH(version),
         });
+    }
+
+    fn destroyDebugCallback(self: *Instance) void {
+        if (!std.debug.runtime_safety)
+            return;
+
+        if (self.debug_callback != null) {
+            c.vkDestroyDebugReportCallbackEXT.?(self.handle, self.debug_callback, memory.vulkan_allocator);
+        }
     }
 
     pub fn getValidationLayers() [1][*c]const u8 {

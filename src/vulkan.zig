@@ -14,79 +14,64 @@ const CommandPool = @import("vulkan/command_pool.zig").CommandPool;
 const CommandBuffer = @import("vulkan/command_buffer.zig").CommandBuffer;
 const ShaderModule = @import("vulkan/shader_module.zig").ShaderModule;
 
-var instance: Instance = undefined;
-var physical_device: PhysicalDevice = undefined;
-var surface: Surface = undefined;
-var device: Device = undefined;
-var swapchain: Swapchain = undefined;
+var allocator: std.mem.Allocator = undefined;
 
-var command_pools: std.ArrayList(CommandPool) = undefined;
-var command_buffers: std.ArrayList(CommandBuffer) = undefined;
+var instance: Instance = .{};
+var physical_device: PhysicalDevice = .{};
+var surface: Surface = .{};
+var device: Device = .{};
+var swapchain: Swapchain = .{};
+
+var command_pools: std.ArrayListUnmanaged(CommandPool) = .{};
+var command_buffers: std.ArrayListUnmanaged(CommandBuffer) = .{};
 var render_pass: c.VkRenderPass = null;
-var framebuffers: std.ArrayList(c.VkFramebuffer) = undefined;
+var framebuffers: std.ArrayListUnmanaged(c.VkFramebuffer) = .{};
 var pipeline_layout: c.VkPipelineLayout = null;
 var pipeline_graphics: c.VkPipeline = null;
 
-// TODO Replace arrays with std.ArrayList across all Vulkan code
-// TODO Remove need to pass device/allocator to deinit functions (not for small objects)
-// TODO Replalce nulls with undefined where error handling suffices
-
-pub fn init(window: *glfw.Window, allocator: std.mem.Allocator) !void {
+pub fn init(window: *glfw.Window, allocator_: std.mem.Allocator) !void {
     log.info("Initializing...", .{});
-    errdefer deinit(allocator);
+    errdefer deinit();
 
+    allocator = allocator_;
     instance = try Instance.init(allocator);
-    errdefer instance.deinit();
-
     physical_device = try PhysicalDevice.init(&instance, allocator);
-    errdefer device.deinit();
-
     surface = try Surface.init(window, &instance, &physical_device);
-    errdefer surface.deinit(&instance);
-
     device = try Device.init(&physical_device, &surface, allocator);
-    errdefer device.deinit();
-
     swapchain = try Swapchain.init(window, &surface, &device, allocator);
-    errdefer swapchain.deinit(&device, allocator);
 
-    createCommandPools(allocator) catch {
+    createCommandPools() catch {
         log.err("Failed to create command pools", .{});
         return error.FailedToCreateCommandPools;
     };
-    errdefer destroyCommandPools();
 
-    createCommandBuffers(allocator) catch {
+    createCommandBuffers() catch {
         log.err("Failed to create command buffers", .{});
         return error.FailedToCreateCommandBuffers;
     };
-    errdefer destroyCommandBuffers();
 
     createRenderPass() catch {
         log.err("Failed to create render pass", .{});
         return error.FailedToCreateRenderPass;
     };
-    errdefer destroyRenderPass();
 
-    createFramebuffers(allocator) catch {
+    createFramebuffers() catch {
         log.err("Failed to create framebuffers", .{});
         return error.FailedToCreateFramebuffers;
     };
-    errdefer destroyFramebuffers();
 
-    createGraphicsPipeline(allocator) catch {
+    createGraphicsPipeline() catch {
         log.err("Failed to create graphics pipeline", .{});
         return error.FailedToCreateGraphicsPipeline;
     };
-    errdefer destroyGraphicsPipeline();
 
     try Instance.printVersion();
 }
 
-pub fn deinit(allocator: std.mem.Allocator) void {
+pub fn deinit() void {
     log.info("Deinitializing...", .{});
 
-    try device.waitIdle();
+    device.waitIdle();
 
     destroyGraphicsPipeline();
     destroyFramebuffers();
@@ -94,53 +79,44 @@ pub fn deinit(allocator: std.mem.Allocator) void {
     destroyCommandBuffers();
     destroyCommandPools();
 
-    swapchain.deinit(&device, allocator);
+    swapchain.deinit();
     device.deinit();
-    surface.deinit(&instance);
+    surface.deinit();
     physical_device.deinit();
     instance.deinit();
 }
 
-pub fn recreateSwapchain(window: *glfw.Window, allocator: std.mem.Allocator) !void {
-    try device.waitIdle();
-
+pub fn recreateSwapchain() !void {
+    device.waitIdle();
     destroyFramebuffers();
 
-    try surface.updateCapabilities(&physical_device);
-    try swapchain.recreate(window, &device, &surface, allocator);
-    try createFramebuffers(allocator);
+    try swapchain.recreate();
+    try createFramebuffers();
 }
 
-fn createCommandPools(allocator: std.mem.Allocator) !void {
+fn createCommandPools() !void {
     log.info("Creating command pools...", .{});
 
-    command_pools = std.ArrayList(CommandPool).init(allocator);
-    errdefer destroyCommandPools();
-
-    try command_pools.ensureTotalCapacityPrecise(swapchain.max_inflight_frames);
+    try command_pools.ensureTotalCapacityPrecise(allocator, swapchain.max_inflight_frames);
     for (0..swapchain.max_inflight_frames) |_| {
-        try command_pools.append(try CommandPool.init(&device));
+        try command_pools.append(allocator, try CommandPool.init(&device));
     }
 }
 
 fn destroyCommandPools() void {
     for (command_pools.items) |*command_pool| {
-        command_pool.deinit(&device);
+        command_pool.deinit();
     }
 
-    command_pools.deinit();
-    command_pools = undefined;
+    command_pools.deinit(allocator);
 }
 
-fn createCommandBuffers(allocator: std.mem.Allocator) !void {
+fn createCommandBuffers() !void {
     log.info("Creating command buffers...", .{});
 
-    command_buffers = std.ArrayList(CommandBuffer).init(allocator);
-    errdefer destroyCommandBuffers();
-
-    try command_buffers.ensureTotalCapacityPrecise(swapchain.max_inflight_frames);
+    try command_buffers.ensureTotalCapacityPrecise(allocator, swapchain.max_inflight_frames);
     for (0..swapchain.max_inflight_frames) |i| {
-        try command_buffers.append(try CommandBuffer.init(&device, &command_pools.items[i], c.VK_COMMAND_BUFFER_LEVEL_PRIMARY));
+        try command_buffers.append(allocator, try CommandBuffer.init(&device, &command_pools.items[i], c.VK_COMMAND_BUFFER_LEVEL_PRIMARY));
     }
 }
 
@@ -149,8 +125,7 @@ fn destroyCommandBuffers() void {
         command_buffer.deinit(&device, &command_pools.items[i]);
     }
 
-    command_buffers.deinit();
-    command_buffers = undefined;
+    command_buffers.deinit(allocator);
 }
 
 fn createRenderPass() !void {
@@ -214,18 +189,15 @@ fn createRenderPass() !void {
 fn destroyRenderPass() void {
     if (render_pass != null) {
         c.vkDestroyRenderPass.?(device.handle, render_pass, memory.vulkan_allocator);
-        render_pass = null;
     }
 }
 
-fn createFramebuffers(allocator: std.mem.Allocator) !void {
+fn createFramebuffers() !void {
     log.info("Creating framebuffers...", .{});
-
-    framebuffers = std.ArrayList(c.VkFramebuffer).init(allocator);
     errdefer destroyFramebuffers();
 
-    try framebuffers.ensureTotalCapacityPrecise(swapchain.image_views.?.len);
-    for (swapchain.image_views.?) |image_view| {
+    try framebuffers.ensureTotalCapacityPrecise(allocator, swapchain.image_views.items.len);
+    for (swapchain.image_views.items) |image_view| {
         const attachments = [_]c.VkImageView{
             image_view,
         };
@@ -244,7 +216,7 @@ fn createFramebuffers(allocator: std.mem.Allocator) !void {
 
         var framebuffer: c.VkFramebuffer = undefined;
         try utility.checkResult(c.vkCreateFramebuffer.?(device.handle, create_info, memory.vulkan_allocator, &framebuffer));
-        try framebuffers.append(framebuffer);
+        try framebuffers.append(allocator, framebuffer);
     }
 }
 
@@ -253,11 +225,11 @@ fn destroyFramebuffers() void {
         c.vkDestroyFramebuffer.?(device.handle, framebuffer, memory.vulkan_allocator);
     }
 
-    framebuffers.deinit();
-    framebuffers = undefined;
+    framebuffers.deinit(allocator);
+    framebuffers = .{};
 }
 
-fn createGraphicsPipeline(allocator: std.mem.Allocator) !void {
+fn createGraphicsPipeline() !void {
     log.info("Creating graphics pipeline...", .{});
 
     const pipeline_layout_create_info = c.VkPipelineLayoutCreateInfo{
@@ -422,12 +394,10 @@ fn createGraphicsPipeline(allocator: std.mem.Allocator) !void {
 fn destroyGraphicsPipeline() void {
     if (pipeline_graphics != null) {
         c.vkDestroyPipeline.?(device.handle, pipeline_graphics, memory.vulkan_allocator);
-        pipeline_graphics = null;
     }
 
     if (pipeline_layout != null) {
         c.vkDestroyPipelineLayout.?(device.handle, pipeline_layout, memory.vulkan_allocator);
-        pipeline_layout = null;
     }
 }
 
@@ -491,10 +461,10 @@ fn recordCommandBuffer(command_buffer: CommandBuffer, image_index: u32) !void {
     try utility.checkResult(c.vkEndCommandBuffer.?(command_buffer.handle));
 }
 
-pub fn render(window: *glfw.Window, allocator: std.mem.Allocator) !void {
-    const image_next = swapchain.acquireNextImage(&device) catch |err| {
+pub fn render() !void {
+    const image_next = swapchain.acquireNextImage() catch |err| {
         if (err == error.SwapchainOutOfDate) {
-            try recreateSwapchain(window, allocator);
+            try recreateSwapchain();
             return;
         } else {
             return err;
@@ -503,7 +473,7 @@ pub fn render(window: *glfw.Window, allocator: std.mem.Allocator) !void {
 
     const frame_index = swapchain.frame_index;
     var command_pool = command_pools.items[frame_index];
-    try command_pool.reset(&device);
+    try command_pool.reset();
 
     var command_buffer = command_buffers.items[frame_index];
     try recordCommandBuffer(command_buffer, image_next.index);
@@ -549,9 +519,9 @@ pub fn render(window: *glfw.Window, allocator: std.mem.Allocator) !void {
         .pResults = null,
     };
 
-    swapchain.present(&device, present_info) catch |err| {
+    swapchain.present(present_info) catch |err| {
         if (err == error.SwapchainOutOfDate or err == error.SwapchainSuboptimal) {
-            try recreateSwapchain(window, allocator);
+            try recreateSwapchain();
             return;
         }
         return err;

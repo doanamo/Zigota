@@ -10,13 +10,17 @@ const PhysicalDevice = @import("physical_device.zig").PhysicalDevice;
 
 pub const Surface = struct {
     handle: c.VkSurfaceKHR = null,
+    instance: *Instance = undefined,
+    physical_device: *const PhysicalDevice = undefined,
     capabilities: c.VkSurfaceCapabilitiesKHR = undefined,
 
-    pub fn init(window: *glfw.Window, instance: *Instance, physical_device: *PhysicalDevice) !Surface {
+    pub fn init(window: *glfw.Window, instance: *Instance, physical_device: *const PhysicalDevice) !Surface {
         var self = Surface{};
-        errdefer self.deinit(instance);
+        self.instance = instance;
+        self.physical_device = physical_device;
+        errdefer self.deinit();
 
-        self.createWindowSurface(window, instance, physical_device) catch {
+        self.createWindowSurface(window, instance) catch {
             log.err("Failed to create window surface", .{});
             return error.FailedToCreatenWindowSurface;
         };
@@ -24,22 +28,24 @@ pub const Surface = struct {
         return self;
     }
 
-    pub fn deinit(self: *Surface, instance: *Instance) void {
-        if (self.handle != null) {
-            c.vkDestroySurfaceKHR.?(instance.handle, self.handle, memory.vulkan_allocator);
-        }
-
+    pub fn deinit(self: *Surface) void {
+        self.destroyWindowSurface();
         self.* = undefined;
     }
 
-    fn createWindowSurface(self: *Surface, window: *glfw.Window, instance: *Instance, physical_device: *PhysicalDevice) !void {
+    fn createWindowSurface(self: *Surface, window: *glfw.Window, instance: *Instance) !void {
         log.info("Creating window surface...", .{});
-
         try utility.checkResult(c.glfwCreateWindowSurface(instance.handle, window.handle, memory.vulkan_allocator, &self.handle));
-        try self.updateCapabilities(physical_device);
+        try self.updateCapabilities();
     }
 
-    pub fn updateCapabilities(self: *Surface, physical_device: *PhysicalDevice) !void {
-        try utility.checkResult(c.vkGetPhysicalDeviceSurfaceCapabilitiesKHR.?(physical_device.handle, self.handle, &self.capabilities));
+    fn destroyWindowSurface(self: *Surface) void {
+        if (self.handle != null) {
+            c.vkDestroySurfaceKHR.?(self.instance.handle, self.handle, memory.vulkan_allocator);
+        }
+    }
+
+    pub fn updateCapabilities(self: *Surface) !void {
+        try utility.checkResult(c.vkGetPhysicalDeviceSurfaceCapabilitiesKHR.?(self.physical_device.handle, self.handle, &self.capabilities));
     }
 };
