@@ -5,6 +5,8 @@ const memory = @import("memory.zig");
 const glfw = @import("glfw.zig");
 const vulkan = @import("vulkan.zig");
 
+const Application = @import("application.zig").Application;
+
 const allocator = memory.default_allocator;
 const log = std.log.scoped(.Main);
 
@@ -48,6 +50,10 @@ pub fn main() !void {
     try vulkan.init(window, allocator);
     defer vulkan.deinit();
 
+    // Create application
+    var application = try Application.init();
+    defer application.deinit();
+
     // Main loop
     log.info("Starting main loop...", .{});
 
@@ -81,10 +87,14 @@ pub fn main() !void {
         if (window.resized) {
             log.info("Window resized to {}x{}", .{ window.width, window.height });
             try vulkan.recreateSwapchain();
+            application.onResize(window.width, window.height);
             window.resized = false;
         }
 
+        application.onUpdate(time_delta);
+
         if (!window.minimized) {
+            application.onRender(1.0);
             try vulkan.render();
         } else {
             std.time.sleep(100 * std.time.ns_per_ms);
