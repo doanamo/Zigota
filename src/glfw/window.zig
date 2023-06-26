@@ -13,6 +13,7 @@ pub const WindowConfig = struct {
 
 pub const Window = struct {
     handle: ?*c.GLFWwindow = null,
+    allocator: std.mem.Allocator = undefined,
     width: u32 = undefined,
     height: u32 = undefined,
     resized: bool = false,
@@ -20,8 +21,10 @@ pub const Window = struct {
 
     pub fn init(config: *const WindowConfig, allocator: std.mem.Allocator) !*Window {
         var self = try allocator.create(Window);
-        errdefer self.deinit(allocator);
-        self.* = .{};
+        self.* = .{
+            .allocator = allocator,
+        };
+        errdefer self.deinit();
 
         self.createWindow(config) catch {
             log.err("Failed to create window", .{});
@@ -31,12 +34,12 @@ pub const Window = struct {
         return self;
     }
 
-    pub fn deinit(self: *Window, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *Window) void {
         if (self.handle != null) {
             c.glfwDestroyWindow(self.handle);
         }
 
-        allocator.destroy(self);
+        self.allocator.destroy(self);
     }
 
     fn createWindow(self: *Window, config: *const WindowConfig) !void {

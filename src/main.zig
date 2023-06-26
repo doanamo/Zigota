@@ -42,7 +42,7 @@ pub fn main() !void {
     };
 
     var window = try glfw.Window.init(&window_config, allocator);
-    defer window.deinit(allocator);
+    defer window.deinit();
 
     // Initialize Vulkan
     try vulkan.init(window, allocator);
