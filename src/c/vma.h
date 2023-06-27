@@ -1,8 +1,7 @@
 #pragma once
 
-#include <stdint.h>
-
-void* (*vmaAlignedMalloc)(size_t size, size_t alignment);
-void (*vmaFree)(void* ptr);
+#define VMA_STATIC_VULKAN_FUNCTIONS 0
+#define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
+#define VMA_VULKAN_VERSION 1003000
 
 #include <VmaUsage.h>

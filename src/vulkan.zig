@@ -9,6 +9,7 @@ const Instance = @import("vulkan/instance.zig").Instance;
 const PhysicalDevice = @import("vulkan/physical_device.zig").PhysicalDevice;
 const Surface = @import("vulkan/surface.zig").Surface;
 const Device = @import("vulkan/device.zig").Device;
+const VmaAllocator = @import("vulkan/memory.zig").VmaAllocator;
 const Swapchain = @import("vulkan/swapchain.zig").Swapchain;
 const CommandPool = @import("vulkan/command_pool.zig").CommandPool;
 const CommandBuffer = @import("vulkan/command_buffer.zig").CommandBuffer;
@@ -20,6 +21,7 @@ var instance: Instance = .{};
 var physical_device: PhysicalDevice = .{};
 var surface: Surface = .{};
 var device: Device = .{};
+var vma_allocator: VmaAllocator = .{};
 var swapchain: Swapchain = .{};
 
 var command_pools: std.ArrayListUnmanaged(CommandPool) = .{};
@@ -33,13 +35,12 @@ pub fn init(window: *glfw.Window, allocator_: std.mem.Allocator) !void {
     log.info("Initializing...", .{});
     errdefer deinit();
 
-    memory.setupVma();
-
     allocator = allocator_;
     instance = try Instance.init(allocator);
     physical_device = try PhysicalDevice.init(&instance, allocator);
     surface = try Surface.init(window, &instance, &physical_device);
     device = try Device.init(&physical_device, &surface, allocator);
+    vma_allocator = try VmaAllocator.init(&instance, &physical_device, &device);
     swapchain = try Swapchain.init(window, &surface, &device, allocator);
 
     createCommandPools() catch {
@@ -66,8 +67,6 @@ pub fn init(window: *glfw.Window, allocator_: std.mem.Allocator) !void {
         log.err("Failed to create graphics pipeline", .{});
         return error.FailedToCreateGraphicsPipeline;
     };
-
-    try Instance.printVersion();
 }
 
 pub fn deinit() void {
@@ -82,6 +81,7 @@ pub fn deinit() void {
     destroyCommandPools();
 
     swapchain.deinit();
+    vma_allocator.deinit();
     device.deinit();
     surface.deinit();
     physical_device.deinit();

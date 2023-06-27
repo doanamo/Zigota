@@ -199,8 +199,6 @@ fn addDependencyVma(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) 
     defer flags.deinit();
 
     try flags.append("-std=c++14");
-    try flags.append("-DVMA_STATIC_VULKAN_FUNCTIONS=0");
-    try flags.append("-DVMA_DYNAMIC_VULKAN_FUNCTIONS=1");
 
     vma.addIncludePath(environment.vulkan_include);
     vma.addIncludePath("deps/vma/src/");

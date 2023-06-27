@@ -6,8 +6,10 @@ const memory = @import("memory.zig");
 const log = utility.log_scoped;
 
 pub const Instance = struct {
+    pub const api_version = c.VK_API_VERSION_1_3;
+
     handle: c.VkInstance = null,
-    debug_callback: if (std.debug.runtime_safety) c.VkDebugReportCallbackEXT else void = undefined,
+    debug_callback: c.VkDebugReportCallbackEXT = null,
 
     pub fn init(allocator: std.mem.Allocator) !Instance {
         var self = Instance{};
@@ -44,7 +46,7 @@ pub const Instance = struct {
             .applicationVersion = c.VK_MAKE_VERSION(1, 0, 0),
             .pEngineName = "Zigota",
             .engineVersion = c.VK_MAKE_VERSION(1, 0, 0),
-            .apiVersion = c.VK_API_VERSION_1_3,
+            .apiVersion = api_version,
         };
 
         const validation_layers = getValidationLayers();
@@ -64,6 +66,14 @@ pub const Instance = struct {
 
         try utility.checkResult(c.vkCreateInstance.?(create_info, memory.vulkan_allocator, &self.handle));
         c.volkLoadInstanceOnly(self.handle);
+
+        var version: u32 = 0;
+        try utility.checkResult(c.vkEnumerateInstanceVersion.?(&version));
+        log.info("Instance version {}.{}.{}", .{
+            c.VK_VERSION_MAJOR(version),
+            c.VK_VERSION_MINOR(version),
+            c.VK_VERSION_PATCH(version),
+        });
     }
 
     fn destroyInstance(self: *Instance) void {
@@ -87,16 +97,6 @@ pub const Instance = struct {
         };
 
         try utility.checkResult(c.vkCreateDebugReportCallbackEXT.?(self.handle, create_info, memory.vulkan_allocator, &self.debug_callback));
-    }
-
-    pub fn printVersion() !void {
-        var version: u32 = 0;
-        try utility.checkResult(c.vkEnumerateInstanceVersion.?(&version));
-        log.info("Instance version {}.{}.{}", .{
-            c.VK_VERSION_MAJOR(version),
-            c.VK_VERSION_MINOR(version),
-            c.VK_VERSION_PATCH(version),
-        });
     }
 
     fn destroyDebugCallback(self: *Instance) void {
