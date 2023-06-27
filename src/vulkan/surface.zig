@@ -35,13 +35,13 @@ pub const Surface = struct {
 
     fn createWindowSurface(self: *Surface, window: *glfw.Window, instance: *Instance) !void {
         log.info("Creating window surface...", .{});
-        try utility.checkResult(c.glfwCreateWindowSurface(instance.handle, window.handle, memory.vulkan_allocator, &self.handle));
+        try utility.checkResult(c.glfwCreateWindowSurface(instance.handle, window.handle, memory.allocation_callbacks, &self.handle));
         try self.updateCapabilities();
     }
 
     fn destroyWindowSurface(self: *Surface) void {
         if (self.handle != null) {
-            c.vkDestroySurfaceKHR.?(self.instance.handle, self.handle, memory.vulkan_allocator);
+            c.vkDestroySurfaceKHR.?(self.instance.handle, self.handle, memory.allocation_callbacks);
         }
     }
 

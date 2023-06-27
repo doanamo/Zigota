@@ -7,7 +7,7 @@ const Instance = @import("instance.zig").Instance;
 const PhysicalDevice = @import("physical_device.zig").PhysicalDevice;
 const Device = @import("device.zig").Device;
 
-pub const vulkan_allocator = &c.VkAllocationCallbacks{
+pub const allocation_callbacks = &c.VkAllocationCallbacks{
     .pUserData = null,
     .pfnAllocation = &vulkanAllocationCallback,
     .pfnReallocation = &vulkanReallocationCallback,
@@ -87,7 +87,7 @@ pub const VmaAllocator = struct {
             .physicalDevice = physical_device.handle,
             .device = device.handle,
             .preferredLargeHeapBlockSize = 0,
-            .pAllocationCallbacks = vulkan_allocator,
+            .pAllocationCallbacks = allocation_callbacks,
             .pDeviceMemoryCallbacks = null,
             .pHeapSizeLimit = null,
             .pVulkanFunctions = vulkan_functions,

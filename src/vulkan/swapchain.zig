@@ -103,12 +103,12 @@ pub const Swapchain = struct {
             .oldSwapchain = null,
         };
 
-        try utility.checkResult(c.vkCreateSwapchainKHR.?(self.device.handle, create_info, memory.vulkan_allocator, &self.handle));
+        try utility.checkResult(c.vkCreateSwapchainKHR.?(self.device.handle, create_info, memory.allocation_callbacks, &self.handle));
     }
 
     fn destroySwapchain(self: *Swapchain) void {
         if (self.handle != null) {
-            c.vkDestroySwapchainKHR.?(self.device.handle, self.handle, memory.vulkan_allocator);
+            c.vkDestroySwapchainKHR.?(self.device.handle, self.handle, memory.allocation_callbacks);
             self.handle = null;
         }
     }
@@ -150,14 +150,14 @@ pub const Swapchain = struct {
             };
 
             var image_view: c.VkImageView = null;
-            try utility.checkResult(c.vkCreateImageView.?(self.device.handle, create_info, memory.vulkan_allocator, &image_view));
+            try utility.checkResult(c.vkCreateImageView.?(self.device.handle, create_info, memory.allocation_callbacks, &image_view));
             try self.image_views.append(self.allocator, image_view);
         }
     }
 
     fn destroyImageViews(self: *Swapchain) void {
         for (self.image_views.items) |image_view| {
-            c.vkDestroyImageView.?(self.device.handle, image_view, memory.vulkan_allocator);
+            c.vkDestroyImageView.?(self.device.handle, image_view, memory.allocation_callbacks);
         }
 
         self.image_views.deinit(self.allocator);
@@ -179,11 +179,11 @@ pub const Swapchain = struct {
             };
 
             var image_available_semaphore: c.VkSemaphore = null;
-            try utility.checkResult(c.vkCreateSemaphore.?(self.device.handle, semaphore_create_info, memory.vulkan_allocator, &image_available_semaphore));
+            try utility.checkResult(c.vkCreateSemaphore.?(self.device.handle, semaphore_create_info, memory.allocation_callbacks, &image_available_semaphore));
             try self.image_available_semaphores.append(self.allocator, image_available_semaphore);
 
             var frame_finished_semaphore: c.VkSemaphore = null;
-            try utility.checkResult(c.vkCreateSemaphore.?(self.device.handle, semaphore_create_info, memory.vulkan_allocator, &frame_finished_semaphore));
+            try utility.checkResult(c.vkCreateSemaphore.?(self.device.handle, semaphore_create_info, memory.allocation_callbacks, &frame_finished_semaphore));
             try self.frame_finished_semaphores.append(self.allocator, frame_finished_semaphore);
 
             const fence_create_info = &c.VkFenceCreateInfo{
@@ -193,22 +193,22 @@ pub const Swapchain = struct {
             };
 
             var frame_inflight_fence: c.VkFence = null;
-            try utility.checkResult(c.vkCreateFence.?(self.device.handle, fence_create_info, memory.vulkan_allocator, &frame_inflight_fence));
+            try utility.checkResult(c.vkCreateFence.?(self.device.handle, fence_create_info, memory.allocation_callbacks, &frame_inflight_fence));
             try self.frame_inflight_fences.append(self.allocator, frame_inflight_fence);
         }
     }
 
     fn destroyImageSynchronization(self: *Swapchain) void {
         for (self.image_available_semaphores.items) |semaphore| {
-            c.vkDestroySemaphore.?(self.device.handle, semaphore, memory.vulkan_allocator);
+            c.vkDestroySemaphore.?(self.device.handle, semaphore, memory.allocation_callbacks);
         }
 
         for (self.frame_finished_semaphores.items) |semaphore| {
-            c.vkDestroySemaphore.?(self.device.handle, semaphore, memory.vulkan_allocator);
+            c.vkDestroySemaphore.?(self.device.handle, semaphore, memory.allocation_callbacks);
         }
 
         for (self.frame_inflight_fences.items) |fence| {
-            c.vkDestroyFence.?(self.device.handle, fence, memory.vulkan_allocator);
+            c.vkDestroyFence.?(self.device.handle, fence, memory.allocation_callbacks);
         }
 
         self.image_available_semaphores.deinit(self.allocator);

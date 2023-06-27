@@ -13,7 +13,10 @@ const VmaAllocator = @import("vulkan/memory.zig").VmaAllocator;
 const Swapchain = @import("vulkan/swapchain.zig").Swapchain;
 const CommandPool = @import("vulkan/command_pool.zig").CommandPool;
 const CommandBuffer = @import("vulkan/command_buffer.zig").CommandBuffer;
+const Buffer = @import("vulkan/buffer.zig").Buffer;
 const ShaderModule = @import("vulkan/shader_module.zig").ShaderModule;
+
+const ColorVertex = @import("vulkan/vertex.zig").ColorVertex;
 
 var allocator: std.mem.Allocator = undefined;
 
@@ -21,13 +24,14 @@ var instance: Instance = .{};
 var physical_device: PhysicalDevice = .{};
 var surface: Surface = .{};
 var device: Device = .{};
-var vma_allocator: VmaAllocator = .{};
+var vma: VmaAllocator = .{};
 var swapchain: Swapchain = .{};
 
 var command_pools: std.ArrayListUnmanaged(CommandPool) = .{};
 var command_buffers: std.ArrayListUnmanaged(CommandBuffer) = .{};
 var render_pass: c.VkRenderPass = null;
 var framebuffers: std.ArrayListUnmanaged(c.VkFramebuffer) = .{};
+var vertex_buffer: Buffer = .{};
 var pipeline_layout: c.VkPipelineLayout = null;
 var pipeline_graphics: c.VkPipeline = null;
 
@@ -40,7 +44,7 @@ pub fn init(window: *glfw.Window, allocator_: std.mem.Allocator) !void {
     physical_device = try PhysicalDevice.init(&instance, allocator);
     surface = try Surface.init(window, &instance, &physical_device);
     device = try Device.init(&physical_device, &surface, allocator);
-    vma_allocator = try VmaAllocator.init(&instance, &physical_device, &device);
+    vma = try VmaAllocator.init(&instance, &physical_device, &device);
     swapchain = try Swapchain.init(window, &surface, &device, allocator);
 
     createCommandPools() catch {
@@ -63,6 +67,11 @@ pub fn init(window: *glfw.Window, allocator_: std.mem.Allocator) !void {
         return error.FailedToCreateFramebuffers;
     };
 
+    createBuffers() catch {
+        log.err("Failed to create vertex buffer", .{});
+        return error.FailedToCreateVertexBuffer;
+    };
+
     createGraphicsPipeline() catch {
         log.err("Failed to create graphics pipeline", .{});
         return error.FailedToCreateGraphicsPipeline;
@@ -75,13 +84,14 @@ pub fn deinit() void {
     device.waitIdle();
 
     destroyGraphicsPipeline();
+    destroyBuffers();
     destroyFramebuffers();
     destroyRenderPass();
     destroyCommandBuffers();
     destroyCommandPools();
 
     swapchain.deinit();
-    vma_allocator.deinit();
+    vma.deinit();
     device.deinit();
     surface.deinit();
     physical_device.deinit();
@@ -185,12 +195,12 @@ fn createRenderPass() !void {
         .pDependencies = subpass_dependency,
     };
 
-    try utility.checkResult(c.vkCreateRenderPass.?(device.handle, create_info, memory.vulkan_allocator, &render_pass));
+    try utility.checkResult(c.vkCreateRenderPass.?(device.handle, create_info, memory.allocation_callbacks, &render_pass));
 }
 
 fn destroyRenderPass() void {
     if (render_pass != null) {
-        c.vkDestroyRenderPass.?(device.handle, render_pass, memory.vulkan_allocator);
+        c.vkDestroyRenderPass.?(device.handle, render_pass, memory.allocation_callbacks);
     }
 }
 
@@ -217,18 +227,52 @@ fn createFramebuffers() !void {
         };
 
         var framebuffer: c.VkFramebuffer = undefined;
-        try utility.checkResult(c.vkCreateFramebuffer.?(device.handle, create_info, memory.vulkan_allocator, &framebuffer));
+        try utility.checkResult(c.vkCreateFramebuffer.?(device.handle, create_info, memory.allocation_callbacks, &framebuffer));
         try framebuffers.append(allocator, framebuffer);
     }
 }
 
 fn destroyFramebuffers() void {
     for (framebuffers.items) |framebuffer| {
-        c.vkDestroyFramebuffer.?(device.handle, framebuffer, memory.vulkan_allocator);
+        c.vkDestroyFramebuffer.?(device.handle, framebuffer, memory.allocation_callbacks);
     }
 
     framebuffers.deinit(allocator);
     framebuffers = .{};
+}
+
+fn createBuffers() !void {
+    log.info("Creating buffers...", .{});
+
+    const vertices = [3]ColorVertex{
+        ColorVertex{
+            .position = [3]f32{ 0.0, -0.5, 0.0 },
+            .color = [4]f32{ 1.0, 0.0, 0.0, 1.0 },
+        },
+        ColorVertex{
+            .position = [3]f32{ 0.5, 0.5, 0.0 },
+            .color = [4]f32{ 0.0, 1.0, 0.0, 1.0 },
+        },
+        ColorVertex{
+            .position = [3]f32{ -0.5, 0.5, 0.0 },
+            .color = [4]f32{ 0.0, 0.0, 1.0, 1.0 },
+        },
+    };
+
+    const buffer_config = &Buffer.Config{
+        .element_size = @sizeOf(ColorVertex),
+        .element_count = vertices.len,
+        .usage = c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        .sharing_mode = c.VK_SHARING_MODE_EXCLUSIVE,
+        .memory_usage = c.VMA_MEMORY_USAGE_AUTO,
+    };
+
+    vertex_buffer = try Buffer.init(&vma, buffer_config);
+    try vertex_buffer.upload(&vma, ColorVertex, &vertices);
+}
+
+fn destroyBuffers() void {
+    vertex_buffer.deinit(&vma);
 }
 
 fn createGraphicsPipeline() !void {
@@ -244,7 +288,7 @@ fn createGraphicsPipeline() !void {
         .pPushConstantRanges = null,
     };
 
-    try utility.checkResult(c.vkCreatePipelineLayout.?(device.handle, &pipeline_layout_create_info, memory.vulkan_allocator, &pipeline_layout));
+    try utility.checkResult(c.vkCreatePipelineLayout.?(device.handle, &pipeline_layout_create_info, memory.allocation_callbacks, &pipeline_layout));
 
     var vertex_shader_module = try ShaderModule.loadFromFile(&device, "data/shaders/simple.vert.spv", allocator);
     defer vertex_shader_module.deinit(&device);
@@ -294,10 +338,10 @@ fn createGraphicsPipeline() !void {
         .sType = c.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .pNext = null,
         .flags = 0,
-        .vertexBindingDescriptionCount = 0,
-        .pVertexBindingDescriptions = null,
-        .vertexAttributeDescriptionCount = 0,
-        .pVertexAttributeDescriptions = null,
+        .vertexBindingDescriptionCount = 1,
+        .pVertexBindingDescriptions = &ColorVertex.binding_description,
+        .vertexAttributeDescriptionCount = ColorVertex.attribute_descriptions.len,
+        .pVertexAttributeDescriptions = &ColorVertex.attribute_descriptions[0],
     };
 
     const input_assembly_state_create_info = &c.VkPipelineInputAssemblyStateCreateInfo{
@@ -390,16 +434,16 @@ fn createGraphicsPipeline() !void {
         .basePipelineIndex = 0,
     };
 
-    try utility.checkResult(c.vkCreateGraphicsPipelines.?(device.handle, null, 1, graphics_pipeline_create_info, memory.vulkan_allocator, &pipeline_graphics));
+    try utility.checkResult(c.vkCreateGraphicsPipelines.?(device.handle, null, 1, graphics_pipeline_create_info, memory.allocation_callbacks, &pipeline_graphics));
 }
 
 fn destroyGraphicsPipeline() void {
     if (pipeline_graphics != null) {
-        c.vkDestroyPipeline.?(device.handle, pipeline_graphics, memory.vulkan_allocator);
+        c.vkDestroyPipeline.?(device.handle, pipeline_graphics, memory.allocation_callbacks);
     }
 
     if (pipeline_layout != null) {
-        c.vkDestroyPipelineLayout.?(device.handle, pipeline_layout, memory.vulkan_allocator);
+        c.vkDestroyPipelineLayout.?(device.handle, pipeline_layout, memory.allocation_callbacks);
     }
 }
 
@@ -457,7 +501,17 @@ fn recordCommandBuffer(command_buffer: CommandBuffer, image_index: u32) !void {
 
     c.vkCmdSetScissor.?(command_buffer.handle, 0, 1, scissors);
 
-    c.vkCmdDraw.?(command_buffer.handle, 3, 1, 0, 0);
+    const vertex_buffers = &[_]c.VkBuffer{
+        vertex_buffer.handle,
+    };
+
+    const vertex_offsets = &[_]c.VkDeviceSize{
+        0,
+    };
+
+    c.vkCmdBindVertexBuffers.?(command_buffer.handle, 0, 1, vertex_buffers, vertex_offsets);
+    c.vkCmdDraw.?(command_buffer.handle, vertex_buffer.element_count, 1, 0, 0);
+
     c.vkCmdEndRenderPass.?(command_buffer.handle);
 
     try utility.checkResult(c.vkEndCommandBuffer.?(command_buffer.handle));

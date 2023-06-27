@@ -97,7 +97,7 @@ pub const Device = struct {
             .pEnabledFeatures = &features,
         };
 
-        try utility.checkResult(c.vkCreateDevice.?(physical_device.handle, create_info, memory.vulkan_allocator, &self.handle));
+        try utility.checkResult(c.vkCreateDevice.?(physical_device.handle, create_info, memory.allocation_callbacks, &self.handle));
 
         c.volkLoadDevice(self.handle);
         c.vkGetDeviceQueue.?(self.handle, self.queue_graphics_index, 0, &self.queue_graphics);
@@ -105,7 +105,7 @@ pub const Device = struct {
 
     fn destroyLogicalDevice(self: *Device) void {
         if (self.handle != null) {
-            c.vkDestroyDevice.?(self.handle, memory.vulkan_allocator);
+            c.vkDestroyDevice.?(self.handle, memory.allocation_callbacks);
         }
     }
 

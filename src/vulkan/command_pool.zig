@@ -23,7 +23,7 @@ pub const CommandPool = struct {
             .queueFamilyIndex = device.queue_graphics_index,
         };
 
-        utility.checkResult(c.vkCreateCommandPool.?(device.handle, create_info, memory.vulkan_allocator, &self.handle)) catch {
+        utility.checkResult(c.vkCreateCommandPool.?(device.handle, create_info, memory.allocation_callbacks, &self.handle)) catch {
             log.err("Failed to create command pool", .{});
             return error.FailedToCreateCommandPool;
         };
@@ -33,7 +33,7 @@ pub const CommandPool = struct {
 
     pub fn deinit(self: *CommandPool) void {
         if (self.handle != null) {
-            c.vkDestroyCommandPool.?(self.device.handle, self.handle, memory.vulkan_allocator);
+            c.vkDestroyCommandPool.?(self.device.handle, self.handle, memory.allocation_callbacks);
         }
         self.* = undefined;
     }
