@@ -10,8 +10,8 @@ pub const Buffer = struct {
         element_size: u32,
         element_count: u32,
         usage: c.VkBufferUsageFlags,
-        sharing_mode: c.VkSharingMode,
-        memory_usage: c.VmaMemoryUsage,
+        sharing_mode: c.VkSharingMode = c.VK_SHARING_MODE_EXCLUSIVE,
+        memory_usage: c.VmaMemoryUsage = c.VMA_MEMORY_USAGE_AUTO,
     };
 
     handle: c.VkBuffer = null,

@@ -263,8 +263,6 @@ fn createBuffers() !void {
         .element_size = @sizeOf(ColorVertex),
         .element_count = vertices.len,
         .usage = c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-        .sharing_mode = c.VK_SHARING_MODE_EXCLUSIVE,
-        .memory_usage = c.VMA_MEMORY_USAGE_AUTO,
     };
 
     vertex_buffer = try Buffer.init(&vma, buffer_config);
