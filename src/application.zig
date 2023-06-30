@@ -12,19 +12,21 @@ pub const Application = struct {
     window: Window = .{},
     renderer: Renderer = .{},
 
-    window_title_buffer: []u8 = &[0]u8{},
     fps_count: u32 = 0,
     fps_time: f32 = 0.0,
 
     pub fn init(self: *Application, allocator: std.mem.Allocator) !void {
         log.info("Initializing...", .{});
+        self.allocator = allocator;
         errdefer self.deinit();
 
-        self.allocator = allocator;
-        self.window_title_buffer = try allocator.alloc(u8, 256);
-
         var window_config = Window.Config{
-            .title = try formatWindowTitle(self.window_title_buffer, 0.0, 0.0),
+            .title = std.fmt.comptimePrint("{s} {}.{}.{}", .{
+                root.project_name,
+                root.project_version.major,
+                root.project_version.minor,
+                root.project_version.patch,
+            }),
             .width = 1024,
             .height = 576,
             .resizable = true,
@@ -48,8 +50,6 @@ pub const Application = struct {
         self.renderer.deinit();
         self.window.deinit();
 
-        self.allocator.free(self.window_title_buffer);
-
         self.* = undefined;
     }
 
@@ -59,11 +59,7 @@ pub const Application = struct {
         if (self.fps_time >= 1.0) {
             const fps_count_avg = @intToFloat(f32, self.fps_count) / self.fps_time;
             const frame_time_avg = self.fps_time / @intToFloat(f32, self.fps_count);
-            self.window.setTitle(try formatWindowTitle(
-                self.window_title_buffer,
-                fps_count_avg,
-                frame_time_avg,
-            ));
+            try self.window.updateTitle(fps_count_avg, frame_time_avg);
             self.fps_count = 0;
             self.fps_time = 0.0;
         }
@@ -85,17 +81,5 @@ pub const Application = struct {
         }
 
         self.fps_count += 1;
-    }
-
-    fn formatWindowTitle(buffer: []u8, fps_count: f32, frame_time: f32) ![:0]u8 {
-        return try std.fmt.bufPrintZ(buffer, "{s} {}.{}.{} - {s} - FPS: {d:.0} ({d:.2}ms)", .{
-            root.project_name,
-            root.project_version.major,
-            root.project_version.minor,
-            root.project_version.patch,
-            @tagName(builtin.mode),
-            fps_count,
-            frame_time * std.time.ms_per_s,
-        });
     }
 };

@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const c = @import("../c.zig");
 const utility = @import("utility.zig");
 const log = utility.log_scoped;
@@ -19,9 +20,15 @@ pub const Window = struct {
     resized: bool = false,
     minimized: bool = false,
 
+    title_initial: [:0]const u8 = undefined,
+    title_buffer: []u8 = &[_]u8{},
+
     pub fn init(self: *Window, config: *const Config, allocator: std.mem.Allocator) !void {
-        self.allocator = allocator;
         errdefer self.deinit();
+
+        self.allocator = allocator;
+        self.title_initial = config.title;
+        self.title_buffer = try allocator.alloc(u8, 256);
 
         self.createWindow(config) catch {
             log.err("Failed to create window", .{});
@@ -34,6 +41,7 @@ pub const Window = struct {
             c.glfwDestroyWindow(self.handle);
         }
 
+        self.allocator.free(self.title_buffer);
         self.* = undefined;
     }
 
@@ -44,17 +52,12 @@ pub const Window = struct {
         c.glfwWindowHint(c.GLFW_RESIZABLE, if (config.resizable) c.GLFW_TRUE else c.GLFW_FALSE);
         c.glfwWindowHint(c.GLFW_VISIBLE, if (config.visible) c.GLFW_TRUE else c.GLFW_FALSE);
 
-        self.handle = c.glfwCreateWindow(
-            config.width,
-            config.height,
-            config.title.ptr,
-            null,
-            null,
-        );
-
+        self.handle = c.glfwCreateWindow(config.width, config.height, "", null, null);
         if (self.handle == null) {
             return error.FailedToCreateWindow;
         }
+
+        try self.updateTitle(0.0, 0.0);
 
         c.glfwSetWindowUserPointer(self.handle, self);
         _ = c.glfwSetFramebufferSizeCallback(self.handle, framebufferSizeCallback);
@@ -82,6 +85,15 @@ pub const Window = struct {
 
     pub fn shouldClose(self: *const Window) bool {
         return c.glfwWindowShouldClose(self.handle) == c.GLFW_TRUE;
+    }
+
+    pub fn updateTitle(self: *Window, fps_count: f32, frame_time: f32) !void {
+        self.setTitle(try std.fmt.bufPrintZ(self.title_buffer, "{s} - {s} - FPS: {d:.0} ({d:.2}ms)", .{
+            self.title_initial,
+            @tagName(builtin.mode),
+            fps_count,
+            frame_time * std.time.ms_per_s,
+        }));
     }
 };
 
