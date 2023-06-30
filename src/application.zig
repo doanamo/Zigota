@@ -54,12 +54,12 @@ pub const Application = struct {
     }
 
     pub fn update(self: *Application, time_delta: f32) !void {
-        // TODO Enapsulate FPS counter/display feature
         self.fps_time += time_delta;
         if (self.fps_time >= 1.0) {
             const fps_count_avg = @intToFloat(f32, self.fps_count) / self.fps_time;
             const frame_time_avg = self.fps_time / @intToFloat(f32, self.fps_count);
             try self.window.updateTitle(fps_count_avg, frame_time_avg);
+
             self.fps_count = 0;
             self.fps_time = 0.0;
         }
@@ -71,9 +71,7 @@ pub const Application = struct {
         }
     }
 
-    pub fn render(self: *Application, time_alpha: f32) !void {
-        _ = time_alpha;
-
+    pub fn render(self: *Application) !void {
         if (!self.window.minimized) {
             try self.renderer.render();
         } else {

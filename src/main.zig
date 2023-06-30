@@ -50,7 +50,7 @@ pub fn main() !void {
         const time_delta = @floatCast(f32, @intToFloat(f64, timer.lap()) / @intToFloat(f64, std.time.ns_per_s));
 
         try application.update(time_delta);
-        try application.render(1.0);
+        try application.render();
     }
 
     log.info("Exiting application...", .{});
