@@ -4,8 +4,10 @@ const c = @import("c.zig");
 const memory = @import("memory.zig");
 const glfw = @import("glfw.zig");
 
+const Config = @import("config.zig").Config;
 const Application = @import("application.zig").Application;
 
+pub var config = Config{};
 pub const project_name = "Zigota";
 pub const project_version = .{
     .major = 0,
@@ -25,10 +27,11 @@ pub fn main() !void {
     });
     log.debug("Debug logging enabled", .{});
 
-    // TODO Add simple config loaded from json file
-
     // Setup memory
     memory.setupMimalloc();
+
+    // Load config
+    try config.init(allocator);
 
     // Initialize GLFW
     try glfw.init();

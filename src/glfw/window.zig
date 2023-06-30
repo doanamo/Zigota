@@ -1,18 +1,17 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const root = @import("root");
 const c = @import("../c.zig");
 const utility = @import("utility.zig");
 const log = utility.log_scoped;
 
-pub const Window = struct {
-    pub const Config = struct {
-        title: [:0]const u8,
-        width: i32 = 1024,
-        height: i32 = 576,
-        resizable: bool = false,
-        visible: bool = false,
-    };
+pub const WindowConfig = struct {
+    width: i32 = 1024,
+    height: i32 = 576,
+    resizable: bool = true,
+};
 
+pub const Window = struct {
     handle: ?*c.GLFWwindow = null,
     allocator: std.mem.Allocator = undefined,
     width: u32 = undefined,
@@ -23,14 +22,14 @@ pub const Window = struct {
     title_initial: [:0]const u8 = undefined,
     title_buffer: []u8 = &[_]u8{},
 
-    pub fn init(self: *Window, config: *const Config, allocator: std.mem.Allocator) !void {
+    pub fn init(self: *Window, title: [:0]const u8, allocator: std.mem.Allocator) !void {
         errdefer self.deinit();
 
         self.allocator = allocator;
-        self.title_initial = config.title;
+        self.title_initial = title;
         self.title_buffer = try allocator.alloc(u8, 256);
 
-        self.createWindow(config) catch {
+        self.createWindow() catch {
             log.err("Failed to create window", .{});
             return error.FailedToCreateWindow;
         };
@@ -45,12 +44,13 @@ pub const Window = struct {
         self.* = undefined;
     }
 
-    fn createWindow(self: *Window, config: *const Config) !void {
+    fn createWindow(self: *Window) !void {
         log.info("Creating window...", .{});
+        const config = root.config.window;
 
         c.glfwWindowHint(c.GLFW_CLIENT_API, c.GLFW_NO_API);
         c.glfwWindowHint(c.GLFW_RESIZABLE, if (config.resizable) c.GLFW_TRUE else c.GLFW_FALSE);
-        c.glfwWindowHint(c.GLFW_VISIBLE, if (config.visible) c.GLFW_TRUE else c.GLFW_FALSE);
+        c.glfwWindowHint(c.GLFW_VISIBLE, c.GLFW_FALSE);
 
         self.handle = c.glfwCreateWindow(config.width, config.height, "", null, null);
         if (self.handle == null) {

@@ -20,20 +20,14 @@ pub const Application = struct {
         self.allocator = allocator;
         errdefer self.deinit();
 
-        var window_config = Window.Config{
-            .title = std.fmt.comptimePrint("{s} {}.{}.{}", .{
-                root.project_name,
-                root.project_version.major,
-                root.project_version.minor,
-                root.project_version.patch,
-            }),
-            .width = 1024,
-            .height = 576,
-            .resizable = true,
-            .visible = false,
-        };
+        const title = std.fmt.comptimePrint("{s} {}.{}.{}", .{
+            root.project_name,
+            root.project_version.major,
+            root.project_version.minor,
+            root.project_version.patch,
+        });
 
-        self.window.init(&window_config, allocator) catch {
+        self.window.init(title, allocator) catch {
             log.err("Failed to initialize window", .{});
             return error.FailedToInitializeWindow;
         };
