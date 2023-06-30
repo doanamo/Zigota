@@ -9,16 +9,23 @@ const PhysicalDevice = @import("physical_device.zig").PhysicalDevice;
 const Surface = @import("surface.zig").Surface;
 
 pub const Device = struct {
+    pub const Queue = struct {
+        type: QueueType = undefined,
+        handle: c.VkQueue = null,
+        index: u32 = queue_index_invalid,
+    };
+
+    pub const QueueType = enum {
+        Graphics,
+        Compute,
+        Transfer,
+    };
+
+    const queue_type_count = @typeInfo(QueueType).Enum.fields.len;
+    const queue_index_invalid = std.math.maxInt(u32);
+
     handle: c.VkDevice = null,
-
-    queue_graphics: c.VkQueue = undefined,
-    queue_graphics_index: u32 = undefined,
-
-    queue_compute: c.VkQueue = undefined,
-    queue_compute_index: u32 = undefined,
-
-    queue_transfer: c.VkQueue = undefined,
-    queue_transfer_index: u32 = undefined,
+    queues: [queue_type_count]Queue = undefined,
 
     pub fn init(self: *Device, physical_device: *const PhysicalDevice, surface: *Surface, allocator: std.mem.Allocator) !void {
         errdefer self.deinit();
@@ -50,7 +57,7 @@ pub const Device = struct {
         defer allocator.free(queue_families);
         c.vkGetPhysicalDeviceQueueFamilyProperties.?(physical_device.handle, &queue_family_count, queue_families.ptr);
 
-        var queue_graphics_found = false;
+        var queue_graphics = self.getQueue(.Graphics);
         for (queue_families, 0..) |queue_family, i| {
             if (queue_family.queueFlags & c.VK_QUEUE_GRAPHICS_BIT == 0)
                 continue;
@@ -60,16 +67,16 @@ pub const Device = struct {
             if (present_support == c.VK_FALSE)
                 continue;
 
-            self.queue_graphics_index = @intCast(u32, i);
-            queue_graphics_found = true;
+            queue_graphics.type = .Graphics;
+            queue_graphics.index = @intCast(u32, i);
         }
 
-        if (!queue_graphics_found) {
+        if (queue_graphics.index == queue_index_invalid) {
             log.err("Failed to find graphics queue family", .{});
             return error.FailedToFindGraphicsQueueFamily;
         }
 
-        var queue_compute_found = false;
+        var queue_compute = self.getQueue(.Compute);
         for (queue_families, 0..) |queue_family, i| {
             if (queue_family.queueFlags & c.VK_QUEUE_COMPUTE_BIT == 0)
                 continue;
@@ -77,16 +84,16 @@ pub const Device = struct {
             if (queue_family.queueFlags & c.VK_QUEUE_GRAPHICS_BIT != 0)
                 continue;
 
-            self.queue_compute_index = @intCast(u32, i);
-            queue_compute_found = true;
+            queue_compute.type = .Compute;
+            queue_compute.index = @intCast(u32, i);
         }
 
-        if (!queue_compute_found) {
+        if (queue_compute.index == queue_index_invalid) {
             log.err("Failed to find compute queue family", .{});
             return error.FailedToFindComputeQueueFamily;
         }
 
-        var queue_transfer_found = false;
+        var queue_transfer = self.getQueue(.Transfer);
         for (queue_families, 0..) |queue_family, i| {
             if (queue_family.queueFlags & c.VK_QUEUE_TRANSFER_BIT == 0)
                 continue;
@@ -97,18 +104,18 @@ pub const Device = struct {
             if (queue_family.queueFlags & c.VK_QUEUE_COMPUTE_BIT != 0)
                 continue;
 
-            self.queue_transfer_index = @intCast(u32, i);
-            queue_transfer_found = true;
+            queue_transfer.type = .Transfer;
+            queue_transfer.index = @intCast(u32, i);
         }
 
-        if (!queue_transfer_found) {
+        if (queue_transfer.index == queue_index_invalid) {
             log.err("Failed to find transfer queue family", .{});
             return error.FailedToFindTransferQueueFamily;
         }
 
-        if (self.queue_graphics_index == self.queue_compute_index or
-            self.queue_compute_index == self.queue_transfer_index or
-            self.queue_transfer_index == self.queue_graphics_index)
+        if (queue_graphics.index == queue_compute.index or
+            queue_compute.index == queue_transfer.index or
+            queue_transfer.index == queue_graphics.index)
         {
             log.err("Failed to find unique queue families", .{});
             return error.FailedToFindUniqueQueueFamilies;
@@ -118,13 +125,17 @@ pub const Device = struct {
     fn createLogicalDevice(self: *Device, physical_device: *const PhysicalDevice) !void {
         log.info("Creating logical device...", .{});
 
+        var queue_graphics = self.getQueue(.Graphics);
+        var queue_compute = self.getQueue(.Compute);
+        var queue_transfer = self.getQueue(.Transfer);
+
         const queue_priorities = [1]f32{1.0};
         const queue_create_infos = &[3]c.VkDeviceQueueCreateInfo{
             c.VkDeviceQueueCreateInfo{
                 .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
                 .pNext = null,
                 .flags = 0,
-                .queueFamilyIndex = self.queue_graphics_index,
+                .queueFamilyIndex = queue_graphics.index,
                 .queueCount = 1,
                 .pQueuePriorities = &queue_priorities,
             },
@@ -132,7 +143,7 @@ pub const Device = struct {
                 .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
                 .pNext = null,
                 .flags = 0,
-                .queueFamilyIndex = self.queue_compute_index,
+                .queueFamilyIndex = queue_compute.index,
                 .queueCount = 1,
                 .pQueuePriorities = &queue_priorities,
             },
@@ -140,7 +151,7 @@ pub const Device = struct {
                 .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
                 .pNext = null,
                 .flags = 0,
-                .queueFamilyIndex = self.queue_transfer_index,
+                .queueFamilyIndex = queue_transfer.index,
                 .queueCount = 1,
                 .pQueuePriorities = &queue_priorities,
             },
@@ -166,9 +177,9 @@ pub const Device = struct {
         try utility.checkResult(c.vkCreateDevice.?(physical_device.handle, create_info, memory.allocation_callbacks, &self.handle));
         c.volkLoadDevice(self.handle);
 
-        c.vkGetDeviceQueue.?(self.handle, self.queue_graphics_index, 0, &self.queue_graphics);
-        c.vkGetDeviceQueue.?(self.handle, self.queue_compute_index, 0, &self.queue_compute);
-        c.vkGetDeviceQueue.?(self.handle, self.queue_transfer_index, 0, &self.queue_transfer);
+        c.vkGetDeviceQueue.?(self.handle, queue_graphics.index, 0, &queue_graphics.handle);
+        c.vkGetDeviceQueue.?(self.handle, queue_compute.index, 0, &queue_compute.handle);
+        c.vkGetDeviceQueue.?(self.handle, queue_transfer.index, 0, &queue_transfer.handle);
     }
 
     fn destroyLogicalDevice(self: *Device) void {
@@ -181,8 +192,12 @@ pub const Device = struct {
         utility.checkResult(c.vkDeviceWaitIdle.?(self.handle)) catch unreachable;
     }
 
-    pub fn submit(self: *Device, submit_count: u32, submit_info: *const c.VkSubmitInfo, fence: c.VkFence) !void {
-        try utility.checkResult(c.vkQueueSubmit.?(self.queue_graphics, submit_count, submit_info, fence));
+    pub fn submit(self: *Device, queue_type: QueueType, submit_count: u32, submit_info: *const c.VkSubmitInfo, fence: c.VkFence) !void {
+        try utility.checkResult(c.vkQueueSubmit.?(self.getQueue(queue_type).handle, submit_count, submit_info, fence));
+    }
+
+    pub fn getQueue(self: *Device, queue_type: QueueType) *Queue {
+        return &self.queues[@enumToInt(queue_type)];
     }
 
     fn getExtensions() [1][*c]const u8 {

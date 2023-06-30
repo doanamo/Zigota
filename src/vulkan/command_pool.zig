@@ -11,7 +11,7 @@ pub const CommandPool = struct {
     handle: c.VkCommandPool = null,
     device: *Device = undefined,
 
-    pub fn init(self: *CommandPool, device: *Device) !void {
+    pub fn init(self: *CommandPool, device: *Device, queue_type: Device.QueueType) !void {
         self.device = device;
         errdefer self.deinit();
 
@@ -19,7 +19,7 @@ pub const CommandPool = struct {
             .sType = c.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             .pNext = null,
             .flags = 0,
-            .queueFamilyIndex = device.queue_graphics_index,
+            .queueFamilyIndex = device.getQueue(queue_type).index,
         };
 
         utility.checkResult(c.vkCreateCommandPool.?(device.handle, create_info, memory.allocation_callbacks, &self.handle)) catch {

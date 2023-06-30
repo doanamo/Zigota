@@ -93,7 +93,7 @@ pub const Renderer = struct {
 
         try self.command_pools.ensureTotalCapacityPrecise(self.allocator, self.vulkan.swapchain.max_inflight_frames);
         for (0..self.vulkan.swapchain.max_inflight_frames) |_| {
-            try self.command_pools.addOneAssumeCapacity().init(&self.vulkan.device);
+            try self.command_pools.addOneAssumeCapacity().init(&self.vulkan.device, .Graphics);
         }
     }
 
@@ -501,7 +501,6 @@ pub const Renderer = struct {
     }
 
     pub fn render(self: *Renderer) !void {
-        // TODO Split into begin/end frame method for Vulkan struct
         const image_next = self.vulkan.swapchain.acquireNextImage() catch |err| {
             if (err == error.SwapchainOutOfDate) {
                 try self.recreateSwapchain();
@@ -546,7 +545,7 @@ pub const Renderer = struct {
             .pSignalSemaphores = &submit_signal_semaphores,
         };
 
-        try self.vulkan.device.submit(1, submit_info, image_next.inflight_fence);
+        try self.vulkan.device.submit(.Graphics, 1, submit_info, image_next.inflight_fence);
 
         const present_info = &c.VkPresentInfoKHR{
             .sType = c.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,

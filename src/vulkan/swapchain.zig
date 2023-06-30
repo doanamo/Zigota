@@ -258,7 +258,7 @@ pub const Swapchain = struct {
     }
 
     pub fn present(self: *Swapchain, present_info: *const c.VkPresentInfoKHR) !void {
-        const result = c.vkQueuePresentKHR.?(self.device.queue_graphics, present_info);
+        const result = c.vkQueuePresentKHR.?(self.device.getQueue(.Graphics).handle, present_info);
 
         switch (result) {
             c.VK_SUCCESS, c.VK_SUBOPTIMAL_KHR => {
