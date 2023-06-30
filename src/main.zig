@@ -41,23 +41,16 @@ pub fn main() !void {
 
     // Main loop
     log.info("Starting main loop...", .{});
+    application.window.show();
 
     var timer = try std.time.Timer.start();
-    var time_previous_ns = timer.read();
-    var time_current_ns = time_previous_ns;
-
-    application.window.show();
     while (!application.window.shouldClose()) {
         glfw.pollEvents();
 
-        // TODO Encapsulate into timer class
-        const time_delta = @floatCast(f32, @intToFloat(f64, time_current_ns - time_previous_ns) / @intToFloat(f64, std.time.ns_per_s));
+        const time_delta = @floatCast(f32, @intToFloat(f64, timer.lap()) / @intToFloat(f64, std.time.ns_per_s));
 
         try application.update(time_delta);
         try application.render(1.0);
-
-        time_previous_ns = time_current_ns;
-        time_current_ns = timer.read();
     }
 
     log.info("Exiting application...", .{});
