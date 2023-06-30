@@ -10,8 +10,15 @@ const Surface = @import("surface.zig").Surface;
 
 pub const Device = struct {
     handle: c.VkDevice = null,
+
     queue_graphics: c.VkQueue = undefined,
     queue_graphics_index: u32 = undefined,
+
+    queue_compute: c.VkQueue = undefined,
+    queue_compute_index: u32 = undefined,
+
+    queue_transfer: c.VkQueue = undefined,
+    queue_transfer_index: u32 = undefined,
 
     pub fn init(physical_device: *const PhysicalDevice, surface: *Surface, allocator: std.mem.Allocator) !Device {
         var self = Device{};
@@ -37,7 +44,6 @@ pub const Device = struct {
     }
 
     fn selectQueueFamilies(self: *Device, physical_device: *const PhysicalDevice, surface: *const Surface, allocator: std.mem.Allocator) !void {
-        // Simplified queue family selection - select one that supports both graphics and presentation
         log.info("Selecting queue families...", .{});
 
         var queue_family_count: u32 = 0;
@@ -47,23 +53,68 @@ pub const Device = struct {
         defer allocator.free(queue_families);
         c.vkGetPhysicalDeviceQueueFamilyProperties.?(physical_device.handle, &queue_family_count, queue_families.ptr);
 
-        var found_suitable_queue = false;
+        var queue_graphics_found = false;
         for (queue_families, 0..) |queue_family, i| {
-            var graphics_support = queue_family.queueFlags & c.VK_QUEUE_GRAPHICS_BIT != 0;
+            if (queue_family.queueFlags & c.VK_QUEUE_GRAPHICS_BIT == 0)
+                continue;
+
             var present_support: c.VkBool32 = c.VK_FALSE;
-
             try utility.checkResult(c.vkGetPhysicalDeviceSurfaceSupportKHR.?(physical_device.handle, @intCast(u32, i), surface.handle, &present_support));
+            if (present_support == c.VK_FALSE)
+                continue;
 
-            if (queue_family.queueCount > 0 and graphics_support == true and present_support == c.VK_TRUE) {
-                self.queue_graphics_index = @intCast(u32, i);
-                found_suitable_queue = true;
-                break;
-            }
+            self.queue_graphics_index = @intCast(u32, i);
+            queue_graphics_found = true;
         }
 
-        if (!found_suitable_queue) {
-            log.err("Failed to find suitable queue family", .{});
-            return error.NoSuitableQueueFamily;
+        if (!queue_graphics_found) {
+            log.err("Failed to find graphics queue family", .{});
+            return error.FailedToFindGraphicsQueueFamily;
+        }
+
+        var queue_compute_found = false;
+        for (queue_families, 0..) |queue_family, i| {
+            if (queue_family.queueFlags & c.VK_QUEUE_COMPUTE_BIT == 0)
+                continue;
+
+            if (queue_family.queueFlags & c.VK_QUEUE_GRAPHICS_BIT != 0)
+                continue;
+
+            self.queue_compute_index = @intCast(u32, i);
+            queue_compute_found = true;
+        }
+
+        if (!queue_compute_found) {
+            log.err("Failed to find compute queue family", .{});
+            return error.FailedToFindComputeQueueFamily;
+        }
+
+        var queue_transfer_found = false;
+        for (queue_families, 0..) |queue_family, i| {
+            if (queue_family.queueFlags & c.VK_QUEUE_TRANSFER_BIT == 0)
+                continue;
+
+            if (queue_family.queueFlags & c.VK_QUEUE_GRAPHICS_BIT != 0)
+                continue;
+
+            if (queue_family.queueFlags & c.VK_QUEUE_COMPUTE_BIT != 0)
+                continue;
+
+            self.queue_transfer_index = @intCast(u32, i);
+            queue_transfer_found = true;
+        }
+
+        if (!queue_transfer_found) {
+            log.err("Failed to find transfer queue family", .{});
+            return error.FailedToFindTransferQueueFamily;
+        }
+
+        if (self.queue_graphics_index == self.queue_compute_index or
+            self.queue_compute_index == self.queue_transfer_index or
+            self.queue_transfer_index == self.queue_graphics_index)
+        {
+            log.err("Failed to find unique queue families", .{});
+            return error.FailedToFindUniqueQueueFamilies;
         }
     }
 
@@ -71,13 +122,31 @@ pub const Device = struct {
         log.info("Creating logical device...", .{});
 
         const queue_priorities = [1]f32{1.0};
-        const queue_create_info = c.VkDeviceQueueCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .pNext = null,
-            .flags = 0,
-            .queueFamilyIndex = self.queue_graphics_index,
-            .queueCount = 1,
-            .pQueuePriorities = &queue_priorities,
+        const queue_create_infos = &[3]c.VkDeviceQueueCreateInfo{
+            c.VkDeviceQueueCreateInfo{
+                .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                .pNext = null,
+                .flags = 0,
+                .queueFamilyIndex = self.queue_graphics_index,
+                .queueCount = 1,
+                .pQueuePriorities = &queue_priorities,
+            },
+            c.VkDeviceQueueCreateInfo{
+                .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                .pNext = null,
+                .flags = 0,
+                .queueFamilyIndex = self.queue_compute_index,
+                .queueCount = 1,
+                .pQueuePriorities = &queue_priorities,
+            },
+            c.VkDeviceQueueCreateInfo{
+                .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                .pNext = null,
+                .flags = 0,
+                .queueFamilyIndex = self.queue_transfer_index,
+                .queueCount = 1,
+                .pQueuePriorities = &queue_priorities,
+            },
         };
 
         const validation_layers = Instance.getValidationLayers();
@@ -88,8 +157,8 @@ pub const Device = struct {
             .sType = c.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
             .pNext = null,
             .flags = 0,
-            .queueCreateInfoCount = 1,
-            .pQueueCreateInfos = &queue_create_info,
+            .queueCreateInfoCount = queue_create_infos.len,
+            .pQueueCreateInfos = queue_create_infos,
             .enabledLayerCount = if (comptime std.debug.runtime_safety) @intCast(u32, validation_layers.len) else 0,
             .ppEnabledLayerNames = if (comptime std.debug.runtime_safety) &validation_layers else null,
             .enabledExtensionCount = @intCast(u32, extensions.len),
@@ -98,9 +167,11 @@ pub const Device = struct {
         };
 
         try utility.checkResult(c.vkCreateDevice.?(physical_device.handle, create_info, memory.allocation_callbacks, &self.handle));
-
         c.volkLoadDevice(self.handle);
+
         c.vkGetDeviceQueue.?(self.handle, self.queue_graphics_index, 0, &self.queue_graphics);
+        c.vkGetDeviceQueue.?(self.handle, self.queue_compute_index, 0, &self.queue_compute);
+        c.vkGetDeviceQueue.?(self.handle, self.queue_transfer_index, 0, &self.queue_transfer);
     }
 
     fn destroyLogicalDevice(self: *Device) void {

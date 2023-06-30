@@ -23,7 +23,7 @@ pub const Buffer = struct {
         var self: Buffer = .{};
         self.element_size = config.element_size;
         self.element_count = config.element_count;
-        errdefer self.deinit();
+        errdefer self.deinit(vma);
 
         const buffer_create_info = &c.VkBufferCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
