@@ -11,11 +11,8 @@ pub fn checkResult(result: c.VkResult) !void {
     switch (result) {
         c.VK_SUCCESS => return,
         else => {
-            if (comptime std.debug.runtime_safety) {
-                std.debug.panic("Vulkan error: {s} (code: {})", .{
-                    c.vkResultToString(result),
-                    result,
-                });
+            if (std.debug.runtime_safety) {
+                @breakpoint();
             }
             return error.VulkanError;
         },
