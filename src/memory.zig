@@ -1,14 +1,13 @@
 const c = @import("c.zig");
 const std = @import("std");
 
-// TODO Add mimalloc asserts on shutdown errors (leaks, corruptions, etc.)
-
 pub const default_allocator = MimallocAllocator;
 
 pub fn setupMimalloc() void {
     if (std.debug.runtime_safety) {
-        c.mi_option_set(c.mi_option_show_stats, 1);
-        c.mi_option_set(c.mi_option_verbose, 1);
+        c.mi_option_enable(c.mi_option_show_errors);
+        c.mi_option_enable(c.mi_option_show_stats);
+        c.mi_option_enable(c.mi_option_verbose);
     }
 }
 
