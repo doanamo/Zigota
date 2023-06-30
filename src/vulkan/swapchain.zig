@@ -1,10 +1,10 @@
 const std = @import("std");
 const c = @import("../c.zig");
-const glfw = @import("../glfw.zig");
 const utility = @import("utility.zig");
 const memory = @import("memory.zig");
 const log = utility.log_scoped;
 
+const Window = @import("../glfw/window.zig").Window;
 const Surface = @import("surface.zig").Surface;
 const Device = @import("device.zig").Device;
 
@@ -19,7 +19,7 @@ pub const Swapchain = struct {
     const present_mode = PresentMode.Immediate;
 
     handle: c.VkSwapchainKHR = null,
-    window: *glfw.Window = undefined,
+    window: *Window = undefined,
     surface: *Surface = undefined,
     device: *Device = undefined,
     allocator: std.mem.Allocator = undefined,
@@ -35,11 +35,10 @@ pub const Swapchain = struct {
     frame_inflight_fences: std.ArrayListUnmanaged(c.VkFence) = .{},
     frame_index: u32 = 0,
 
-    pub fn init(window: *glfw.Window, surface: *Surface, device: *Device, allocator: std.mem.Allocator) !Swapchain {
-        var self = Swapchain{};
-        self.device = device;
+    pub fn init(self: *Swapchain, window: *Window, surface: *Surface, device: *Device, allocator: std.mem.Allocator) !void {
         self.window = window;
         self.surface = surface;
+        self.device = device;
         self.allocator = allocator;
         errdefer self.deinit();
 
@@ -57,8 +56,6 @@ pub const Swapchain = struct {
             log.err("Failed to create image synchronization", .{});
             return error.FailedToCreateImageSynchronization;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *Swapchain) void {

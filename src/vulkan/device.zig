@@ -1,7 +1,7 @@
 const std = @import("std");
 const c = @import("../c.zig");
-const utility = @import("utility.zig");
 const memory = @import("memory.zig");
+const utility = @import("utility.zig");
 const log = utility.log_scoped;
 
 const Instance = @import("instance.zig").Instance;
@@ -20,8 +20,7 @@ pub const Device = struct {
     queue_transfer: c.VkQueue = undefined,
     queue_transfer_index: u32 = undefined,
 
-    pub fn init(physical_device: *const PhysicalDevice, surface: *Surface, allocator: std.mem.Allocator) !Device {
-        var self = Device{};
+    pub fn init(self: *Device, physical_device: *const PhysicalDevice, surface: *Surface, allocator: std.mem.Allocator) !void {
         errdefer self.deinit();
 
         self.selectQueueFamilies(physical_device, surface, allocator) catch {
@@ -33,8 +32,6 @@ pub const Device = struct {
             log.err("Failed to create logical device", .{});
             return error.FailedToCreateLogicalDevice;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *Device) void {

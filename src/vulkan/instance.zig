@@ -1,8 +1,9 @@
 const std = @import("std");
+const root = @import("root");
 const builtins = @import("builtins");
 const c = @import("../c.zig");
-const utility = @import("utility.zig");
 const memory = @import("memory.zig");
+const utility = @import("utility.zig");
 const log = utility.log_scoped;
 
 pub const Instance = struct {
@@ -11,8 +12,7 @@ pub const Instance = struct {
     handle: c.VkInstance = null,
     debug_callback: c.VkDebugReportCallbackEXT = null,
 
-    pub fn init(allocator: std.mem.Allocator) !Instance {
-        var self = Instance{};
+    pub fn init(self: *Instance, allocator: std.mem.Allocator) !void {
         errdefer self.deinit();
 
         self.createInstance(allocator) catch {
@@ -24,8 +24,6 @@ pub const Instance = struct {
             log.err("Failed to create debug callback", .{});
             return error.FailedToCreateDebugCallback;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *Instance) void {
@@ -39,13 +37,19 @@ pub const Instance = struct {
 
         try utility.checkResult(c.volkInitialize());
 
+        const project_version = c.VK_MAKE_VERSION(
+            root.project_version.major,
+            root.project_version.minor,
+            root.project_version.patch,
+        );
+
         const application_info = &c.VkApplicationInfo{
             .sType = c.VK_STRUCTURE_TYPE_APPLICATION_INFO,
             .pNext = null,
-            .pApplicationName = "Zigota",
-            .applicationVersion = c.VK_MAKE_VERSION(1, 0, 0),
-            .pEngineName = "Zigota",
-            .engineVersion = c.VK_MAKE_VERSION(1, 0, 0),
+            .pApplicationName = root.project_name,
+            .applicationVersion = project_version,
+            .pEngineName = root.project_name,
+            .engineVersion = project_version,
             .apiVersion = api_version,
         };
 
@@ -67,12 +71,12 @@ pub const Instance = struct {
         try utility.checkResult(c.vkCreateInstance.?(create_info, memory.allocation_callbacks, &self.handle));
         c.volkLoadInstanceOnly(self.handle);
 
-        var version: u32 = 0;
-        try utility.checkResult(c.vkEnumerateInstanceVersion.?(&version));
+        var instance_version: u32 = 0;
+        try utility.checkResult(c.vkEnumerateInstanceVersion.?(&instance_version));
         log.info("Instance version {}.{}.{}", .{
-            c.VK_VERSION_MAJOR(version),
-            c.VK_VERSION_MINOR(version),
-            c.VK_VERSION_PATCH(version),
+            c.VK_VERSION_MAJOR(instance_version),
+            c.VK_VERSION_MINOR(instance_version),
+            c.VK_VERSION_PATCH(instance_version),
         });
     }
 

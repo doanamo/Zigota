@@ -1,27 +1,31 @@
-const c = @import("c.zig");
 const std = @import("std");
 const builtin = @import("builtin");
+const c = @import("c.zig");
 const memory = @import("memory.zig");
 const glfw = @import("glfw.zig");
-const vulkan = @import("vulkan.zig");
 
 const Application = @import("application.zig").Application;
+
+pub const project_name = "Zigota";
+pub const project_version = .{
+    .major = 0,
+    .minor = 1,
+    .patch = 0,
+};
 
 const allocator = memory.default_allocator;
 const log = std.log.scoped(.Main);
 
-fn formatWindowTitle(buffer: []u8, title: []const u8, fps_count: f32, frame_time: f32) ![:0]u8 {
-    return try std.fmt.bufPrintZ(buffer, "{s} - {s} - FPS: {d:.0} ({d:.2}ms)", .{
-        title,
-        @tagName(builtin.mode),
-        fps_count,
-        frame_time * std.time.ms_per_s,
-    });
-}
-
 pub fn main() !void {
-    log.info("Starting application...", .{});
+    log.info("Starting {s} {}.{}.{}...", .{
+        project_name,
+        project_version.major,
+        project_version.minor,
+        project_version.patch,
+    });
     log.debug("Debug logging enabled", .{});
+
+    // TODO Add simple config loaded from json file
 
     // Setup memory
     memory.setupMimalloc();
@@ -30,28 +34,9 @@ pub fn main() !void {
     try glfw.init();
     defer glfw.deinit();
 
-    // Create window
-    var window_title_buffer = try allocator.alloc(u8, 256);
-    defer allocator.free(window_title_buffer);
-
-    const window_title = "Zigota";
-    var window_config = glfw.WindowConfig{
-        .title = try formatWindowTitle(window_title_buffer, window_title, 0.0, 0.0),
-        .width = 1024,
-        .height = 576,
-        .resizable = true,
-        .visible = false,
-    };
-
-    var window = try glfw.Window.init(&window_config, allocator);
-    defer window.deinit();
-
-    // Initialize Vulkan
-    try vulkan.init(window, allocator);
-    defer vulkan.deinit();
-
     // Create application
-    var application = try Application.init();
+    var application = Application{};
+    try application.init(allocator);
     defer application.deinit();
 
     // Main loop
@@ -61,48 +46,18 @@ pub fn main() !void {
     var time_previous_ns = timer.read();
     var time_current_ns = time_previous_ns;
 
-    var fps_count: u32 = 0;
-    var fps_time: f32 = 0.0;
-
-    window.show();
-    while (!window.shouldClose()) {
-        const time_delta = @floatCast(f32, @intToFloat(f64, time_current_ns - time_previous_ns) / @intToFloat(f64, std.time.ns_per_s));
-
-        fps_time += time_delta;
-        if (fps_time >= 1.0) {
-            const fps_count_avg = @intToFloat(f32, fps_count) / fps_time;
-            const frame_time_avg = fps_time / @intToFloat(f32, fps_count);
-            window.setTitle(try formatWindowTitle(
-                window_title_buffer,
-                window_title,
-                fps_count_avg,
-                frame_time_avg,
-            ));
-            fps_count = 0;
-            fps_time = 0.0;
-        }
-
+    application.window.show();
+    while (!application.window.shouldClose()) {
         glfw.pollEvents();
 
-        if (window.resized) {
-            log.info("Window resized to {}x{}", .{ window.width, window.height });
-            try vulkan.recreateSwapchain();
-            application.onResize(window.width, window.height);
-            window.resized = false;
-        }
+        // TODO Encapsulate into timer class
+        const time_delta = @floatCast(f32, @intToFloat(f64, time_current_ns - time_previous_ns) / @intToFloat(f64, std.time.ns_per_s));
 
-        application.onUpdate(time_delta);
-
-        if (!window.minimized) {
-            application.onRender(1.0);
-            try vulkan.render();
-        } else {
-            std.time.sleep(100 * std.time.ns_per_ms);
-        }
+        try application.update(time_delta);
+        try application.render(1.0);
 
         time_previous_ns = time_current_ns;
         time_current_ns = timer.read();
-        fps_count += 1;
     }
 
     log.info("Exiting application...", .{});

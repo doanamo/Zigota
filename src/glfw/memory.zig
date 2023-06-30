@@ -1,5 +1,5 @@
-const c = @import("c.zig");
 const std = @import("std");
+const c = @import("../c.zig");
 
 //var allocator_callbacks: c.GLFWallocator = undefined; // TODO Waiting for GLFW 3.4.0
 

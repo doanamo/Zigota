@@ -1,9 +1,10 @@
 const std = @import("std");
 const c = @import("../c.zig");
-const utility = @import("utility.zig");
 const memory = @import("memory.zig");
+const utility = @import("utility.zig");
+const log = utility.log_scoped;
 
-const VmaAllocator = memory.VmaAllocator;
+const VmaAllocator = @import("vma.zig").VmaAllocator;
 
 pub const Buffer = struct {
     pub const Config = struct {
@@ -19,8 +20,8 @@ pub const Buffer = struct {
     element_size: u32 = undefined,
     element_count: u32 = undefined,
 
-    pub fn init(vma: *VmaAllocator, config: *const Config) !Buffer {
-        var self: Buffer = .{};
+    pub fn init(self: *Buffer, vma: *VmaAllocator, config: *const Config) !void {
+        log.info("Creating buffer... (size {} bytes)", .{config.element_size * config.element_count});
         self.element_size = config.element_size;
         self.element_count = config.element_count;
         errdefer self.deinit(vma);
@@ -48,8 +49,6 @@ pub const Buffer = struct {
         };
 
         try utility.checkResult(c.vmaCreateBuffer(vma.handle, buffer_create_info, allocation_create_info, &self.handle, &self.allocation, null));
-
-        return self;
     }
 
     pub fn deinit(self: *Buffer, vma: *VmaAllocator) void {

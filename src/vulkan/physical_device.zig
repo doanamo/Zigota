@@ -10,16 +10,13 @@ pub const PhysicalDevice = struct {
     properties: c.VkPhysicalDeviceProperties = undefined,
     features: c.VkPhysicalDeviceFeatures = undefined,
 
-    pub fn init(instance: *Instance, allocator: std.mem.Allocator) !PhysicalDevice {
-        var self = PhysicalDevice{};
+    pub fn init(self: *PhysicalDevice, instance: *Instance, allocator: std.mem.Allocator) !void {
         errdefer self.deinit();
 
         self.selectPhysicalDevice(instance, allocator) catch {
             log.err("Failed to select physical device", .{});
             return error.FailedToSelectPhysicalDevice;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *PhysicalDevice) void {

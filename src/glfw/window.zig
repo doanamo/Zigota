@@ -1,17 +1,17 @@
 const std = @import("std");
 const c = @import("../c.zig");
 const utility = @import("utility.zig");
-const log = std.log.scoped(.GLFW);
-
-pub const WindowConfig = struct {
-    title: [:0]const u8,
-    width: i32 = 1024,
-    height: i32 = 576,
-    resizable: bool = false,
-    visible: bool = false,
-};
+const log = utility.log_scoped;
 
 pub const Window = struct {
+    pub const Config = struct {
+        title: [:0]const u8,
+        width: i32 = 1024,
+        height: i32 = 576,
+        resizable: bool = false,
+        visible: bool = false,
+    };
+
     handle: ?*c.GLFWwindow = null,
     allocator: std.mem.Allocator = undefined,
     width: u32 = undefined,
@@ -19,19 +19,14 @@ pub const Window = struct {
     resized: bool = false,
     minimized: bool = false,
 
-    pub fn init(config: *const WindowConfig, allocator: std.mem.Allocator) !*Window {
-        var self = try allocator.create(Window);
-        self.* = .{
-            .allocator = allocator,
-        };
+    pub fn init(self: *Window, config: *const Config, allocator: std.mem.Allocator) !void {
+        self.allocator = allocator;
         errdefer self.deinit();
 
         self.createWindow(config) catch {
             log.err("Failed to create window", .{});
             return error.FailedToCreateWindow;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *Window) void {
@@ -39,10 +34,10 @@ pub const Window = struct {
             c.glfwDestroyWindow(self.handle);
         }
 
-        self.allocator.destroy(self);
+        self.* = undefined;
     }
 
-    fn createWindow(self: *Window, config: *const WindowConfig) !void {
+    fn createWindow(self: *Window, config: *const Config) !void {
         log.info("Creating window...", .{});
 
         c.glfwWindowHint(c.GLFW_CLIENT_API, c.GLFW_NO_API);

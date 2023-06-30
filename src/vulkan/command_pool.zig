@@ -1,7 +1,7 @@
 const std = @import("std");
 const c = @import("../c.zig");
-const utility = @import("utility.zig");
 const memory = @import("memory.zig");
+const utility = @import("utility.zig");
 const log = utility.log_scoped;
 
 const Device = @import("device.zig").Device;
@@ -11,8 +11,7 @@ pub const CommandPool = struct {
     handle: c.VkCommandPool = null,
     device: *Device = undefined,
 
-    pub fn init(device: *Device) !CommandPool {
-        var self = CommandPool{};
+    pub fn init(self: *CommandPool, device: *Device) !void {
         self.device = device;
         errdefer self.deinit();
 
@@ -27,8 +26,6 @@ pub const CommandPool = struct {
             log.err("Failed to create command pool", .{});
             return error.FailedToCreateCommandPool;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *CommandPool) void {

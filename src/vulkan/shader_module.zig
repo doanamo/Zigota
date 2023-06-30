@@ -1,6 +1,5 @@
 const std = @import("std");
 const c = @import("../c.zig");
-const glfw = @import("../glfw.zig");
 const utility = @import("utility.zig");
 const memory = @import("memory.zig");
 const log = utility.log_scoped;
@@ -11,6 +10,7 @@ pub const ShaderModule = struct {
     const ByteCode = []align(@alignOf(u32)) u8;
 
     handle: c.VkShaderModule = null,
+    device: *Device = undefined,
 
     pub fn loadFromFile(device: *Device, path: []const u8, allocator: std.mem.Allocator) !ShaderModule {
         log.info("Loading shader module from \"{s}\" file...", .{path});
@@ -25,28 +25,28 @@ pub const ShaderModule = struct {
         );
         defer allocator.free(byte_code);
 
-        return try init(device, byte_code);
+        var shader_module: ShaderModule = .{};
+        try shader_module.init(device, byte_code);
+        return shader_module;
     }
 
-    pub fn init(device: *Device, bytes: ByteCode) !ShaderModule {
-        var self = ShaderModule{};
-        errdefer self.deinit(device);
+    pub fn init(self: *ShaderModule, device: *Device, bytes: ByteCode) !void {
+        self.device = device;
+        errdefer self.deinit();
 
-        self.createShaderModule(device, bytes) catch {
+        self.createShaderModule(bytes) catch {
             log.err("Failed to create shader module", .{});
             return error.FailedToCreateShaderModule;
         };
-
-        return self;
     }
 
-    pub fn deinit(self: *ShaderModule, device: *Device) void {
-        self.destroyShaderModule(device);
+    pub fn deinit(self: *ShaderModule) void {
+        self.destroyShaderModule();
         self.* = undefined;
     }
 
-    fn createShaderModule(self: *ShaderModule, device: *Device, bytes: ByteCode) !void {
-        log.info("Creatng shader module...", .{});
+    fn createShaderModule(self: *ShaderModule, bytes: ByteCode) !void {
+        log.info("Creating shader module...", .{});
 
         const create_info = &c.VkShaderModuleCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -56,12 +56,12 @@ pub const ShaderModule = struct {
             .pCode = std.mem.bytesAsSlice(u32, bytes).ptr,
         };
 
-        try utility.checkResult(c.vkCreateShaderModule.?(device.handle, create_info, memory.allocation_callbacks, &self.handle));
+        try utility.checkResult(c.vkCreateShaderModule.?(self.device.handle, create_info, memory.allocation_callbacks, &self.handle));
     }
 
-    fn destroyShaderModule(self: *ShaderModule, device: *Device) void {
+    fn destroyShaderModule(self: *ShaderModule) void {
         if (self.handle != null) {
-            c.vkDestroyShaderModule.?(device.handle, self.handle, memory.allocation_callbacks);
+            c.vkDestroyShaderModule.?(self.device.handle, self.handle, memory.allocation_callbacks);
         }
     }
 };
