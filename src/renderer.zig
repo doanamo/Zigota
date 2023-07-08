@@ -19,6 +19,7 @@ pub const Renderer = struct {
     command_pools: std.ArrayListUnmanaged(CommandPool) = .{},
     command_buffers: std.ArrayListUnmanaged(CommandBuffer) = .{},
     vertex_buffer: Buffer = .{},
+    index_buffer: Buffer = .{},
     pipeline_layout: c.VkPipelineLayout = null,
     pipeline_graphics: c.VkPipeline = null,
 
@@ -97,7 +98,7 @@ pub const Renderer = struct {
     fn createBuffers(self: *Renderer) !void {
         log.info("Creating buffers...", .{});
 
-        const vertices = [3]ColorVertex{
+        const vertices = [_]ColorVertex{
             ColorVertex{
                 .position = [3]f32{ 0.0, -0.5, 0.0 },
                 .color = [4]f32{ 1.0, 0.0, 0.0, 1.0 },
@@ -110,18 +111,35 @@ pub const Renderer = struct {
                 .position = [3]f32{ -0.5, 0.5, 0.0 },
                 .color = [4]f32{ 0.0, 0.0, 1.0, 1.0 },
             },
+            ColorVertex{
+                .position = [3]f32{ 0.75, -0.5, 0.0 },
+                .color = [4]f32{ 1.0, 1.0, 0.0, 1.0 },
+            },
+            ColorVertex{
+                .position = [3]f32{ -0.75, -0.5, 0.0 },
+                .color = [4]f32{ 1.0, 0.0, 1.0, 1.0 },
+            },
         };
+
+        const indices = [_]u16{ 0, 1, 2, 3, 1, 0, 4, 0, 2 };
 
         try self.vertex_buffer.init(&self.vulkan.vma, &.{
             .size_bytes = @sizeOf(ColorVertex) * vertices.len,
             .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT | c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
         });
 
+        try self.index_buffer.init(&self.vulkan.vma, &.{
+            .size_bytes = @sizeOf(u16) * indices.len,
+            .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT | c.VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        });
+
         try self.vulkan.transfer.upload(&self.vertex_buffer, 0, std.mem.sliceAsBytes(&vertices));
+        try self.vulkan.transfer.upload(&self.index_buffer, 0, std.mem.sliceAsBytes(&indices));
     }
 
     fn destroyBuffers(self: *Renderer) void {
         self.vertex_buffer.deinit(&self.vulkan.vma);
+        self.index_buffer.deinit(&self.vulkan.vma);
     }
 
     fn createGraphicsPipeline(self: *Renderer) !void {
@@ -439,7 +457,8 @@ pub const Renderer = struct {
         };
 
         c.vkCmdBindVertexBuffers.?(command_buffer.handle, 0, 1, vertex_buffers, vertex_offsets);
-        c.vkCmdDraw.?(command_buffer.handle, 3, 1, 0, 0);
+        c.vkCmdBindIndexBuffer.?(command_buffer.handle, self.index_buffer.handle, 0, c.VK_INDEX_TYPE_UINT16);
+        c.vkCmdDrawIndexed.?(command_buffer.handle, @intCast(self.index_buffer.size_bytes / @sizeOf(u16)), 1, 0, 0, 0);
 
         c.vkCmdEndRendering.?(command_buffer.handle);
 
