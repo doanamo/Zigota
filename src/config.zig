@@ -20,6 +20,9 @@ pub const Config = struct {
         );
         defer allocator.free(content);
 
-        self.* = try std.json.parseFromSlice(Config, allocator, content, .{});
+        var parsed = try std.json.parseFromSlice(Config, allocator, content, .{});
+        defer parsed.deinit();
+
+        self.* = parsed.value;
     }
 };

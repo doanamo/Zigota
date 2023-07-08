@@ -50,7 +50,7 @@ pub fn main() !void {
     while (!application.window.shouldClose()) {
         glfw.pollEvents();
 
-        const time_delta = @floatCast(f32, @intToFloat(f64, timer.lap()) / @intToFloat(f64, std.time.ns_per_s));
+        const time_delta: f32 = @floatCast(@as(f64, @floatFromInt(timer.lap())) / @as(f64, @floatFromInt(std.time.ns_per_s)));
 
         try application.update(time_delta);
         try application.render();

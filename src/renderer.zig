@@ -416,8 +416,8 @@ pub const Renderer = struct {
         c.vkCmdSetViewport.?(command_buffer.handle, 0, 1, &c.VkViewport{
             .x = 0.0,
             .y = 0.0,
-            .width = @intToFloat(f32, self.vulkan.swapchain.extent.width),
-            .height = @intToFloat(f32, self.vulkan.swapchain.extent.height),
+            .width = @floatFromInt(self.vulkan.swapchain.extent.width),
+            .height = @floatFromInt(self.vulkan.swapchain.extent.height),
             .minDepth = 0.0,
             .maxDepth = 1.0,
         });

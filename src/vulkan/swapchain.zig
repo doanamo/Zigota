@@ -96,7 +96,7 @@ pub const Swapchain = struct {
             .pQueueFamilyIndices = null,
             .preTransform = self.surface.capabilities.currentTransform,
             .compositeAlpha = c.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-            .presentMode = @enumToInt(present_mode),
+            .presentMode = @intFromEnum(present_mode),
             .clipped = c.VK_TRUE,
             .oldSwapchain = null,
         };

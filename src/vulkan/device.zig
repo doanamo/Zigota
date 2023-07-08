@@ -63,12 +63,12 @@ pub const Device = struct {
                 continue;
 
             var present_support: c.VkBool32 = c.VK_FALSE;
-            try utility.checkResult(c.vkGetPhysicalDeviceSurfaceSupportKHR.?(physical_device.handle, @intCast(u32, i), surface.handle, &present_support));
+            try utility.checkResult(c.vkGetPhysicalDeviceSurfaceSupportKHR.?(physical_device.handle, @intCast(i), surface.handle, &present_support));
             if (present_support == c.VK_FALSE)
                 continue;
 
             queue_graphics.type = .Graphics;
-            queue_graphics.index = @intCast(u32, i);
+            queue_graphics.index = @intCast(i);
         }
 
         if (queue_graphics.index == queue_index_invalid) {
@@ -85,7 +85,7 @@ pub const Device = struct {
                 continue;
 
             queue_compute.type = .Compute;
-            queue_compute.index = @intCast(u32, i);
+            queue_compute.index = @intCast(i);
         }
 
         if (queue_compute.index == queue_index_invalid) {
@@ -105,7 +105,7 @@ pub const Device = struct {
                 continue;
 
             queue_transfer.type = .Transfer;
-            queue_transfer.index = @intCast(u32, i);
+            queue_transfer.index = @intCast(i);
         }
 
         if (queue_transfer.index == queue_index_invalid) {
@@ -175,7 +175,7 @@ pub const Device = struct {
 
         var timeline_semaphore_features = c.VkPhysicalDeviceTimelineSemaphoreFeatures{
             .sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
-            .pNext = @ptrCast(*anyopaque, &synchronization_features),
+            .pNext = @ptrCast(&synchronization_features),
             .timelineSemaphore = c.VK_TRUE,
         };
 
@@ -185,9 +185,9 @@ pub const Device = struct {
             .flags = 0,
             .queueCreateInfoCount = queue_create_infos.len,
             .pQueueCreateInfos = &queue_create_infos,
-            .enabledLayerCount = if (std.debug.runtime_safety) @intCast(u32, validation_layers.len) else 0,
+            .enabledLayerCount = if (std.debug.runtime_safety) @intCast(validation_layers.len) else 0,
             .ppEnabledLayerNames = if (std.debug.runtime_safety) &validation_layers else null,
-            .enabledExtensionCount = @intCast(u32, extensions.len),
+            .enabledExtensionCount = @intCast(extensions.len),
             .ppEnabledExtensionNames = &extensions,
             .pEnabledFeatures = &features,
         };
@@ -215,7 +215,7 @@ pub const Device = struct {
     }
 
     pub fn getQueue(self: *Device, queue_type: QueueType) *Queue {
-        return &self.queues[@enumToInt(queue_type)];
+        return &self.queues[@intFromEnum(queue_type)];
     }
 
     fn getExtensions() [1][*c]const u8 {

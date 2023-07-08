@@ -62,7 +62,7 @@ pub const Buffer = struct {
 
         var data: ?*anyopaque = undefined;
         try utility.checkResult(c.vmaMapMemory(vma.handle, self.allocation, &data));
-        return @ptrCast([*]T, @alignCast(4, data))[0 .. self.size_bytes / @sizeOf(T)];
+        return @as([*]T, @ptrCast(@alignCast(data)))[0 .. self.size_bytes / @sizeOf(T)];
     }
 
     pub fn unmap(self: *Buffer, vma: *VmaAllocator) void {

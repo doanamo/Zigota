@@ -113,7 +113,7 @@ pub const Transfer = struct {
 
         const semaphore_create_info = c.VkSemaphoreCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-            .pNext = @ptrCast(*const anyopaque, &semaphore_type_create_info),
+            .pNext = @ptrCast(&semaphore_type_create_info),
             .flags = 0,
         };
 
@@ -223,7 +223,7 @@ pub const Transfer = struct {
                 .dependencyFlags = 0,
                 .memoryBarrierCount = 0,
                 .pMemoryBarriers = null,
-                .bufferMemoryBarrierCount = @intCast(u32, self.buffer_ownership_transfers_source.items.len),
+                .bufferMemoryBarrierCount = @intCast(self.buffer_ownership_transfers_source.items.len),
                 .pBufferMemoryBarriers = self.buffer_ownership_transfers_source.items.ptr,
                 .imageMemoryBarrierCount = 0,
                 .pImageMemoryBarriers = null,
@@ -246,7 +246,7 @@ pub const Transfer = struct {
 
         const submit_info = c.VkSubmitInfo{
             .sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO,
-            .pNext = @ptrCast(*const anyopaque, &timeline_semaphore_submit_info),
+            .pNext = @ptrCast(&timeline_semaphore_submit_info),
             .waitSemaphoreCount = 0,
             .pWaitSemaphores = null,
             .pWaitDstStageMask = null,
@@ -283,7 +283,7 @@ pub const Transfer = struct {
             .dependencyFlags = 0,
             .memoryBarrierCount = 0,
             .pMemoryBarriers = null,
-            .bufferMemoryBarrierCount = @intCast(u32, self.buffer_ownership_transfers_target.items.len),
+            .bufferMemoryBarrierCount = @intCast(self.buffer_ownership_transfers_target.items.len),
             .pBufferMemoryBarriers = self.buffer_ownership_transfers_target.items.ptr,
             .imageMemoryBarrierCount = 0,
             .pImageMemoryBarriers = null,

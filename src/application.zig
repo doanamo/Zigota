@@ -50,8 +50,8 @@ pub const Application = struct {
     pub fn update(self: *Application, time_delta: f32) !void {
         self.fps_time += time_delta;
         if (self.fps_time >= 1.0) {
-            const fps_count_avg = @intToFloat(f32, self.fps_count) / self.fps_time;
-            const frame_time_avg = self.fps_time / @intToFloat(f32, self.fps_count);
+            const fps_count_avg = @as(f32, @floatFromInt(self.fps_count)) / self.fps_time;
+            const frame_time_avg = self.fps_time / @as(f32, @floatFromInt(self.fps_count));
             try self.window.updateTitle(fps_count_avg, frame_time_avg);
 
             self.fps_count = 0;

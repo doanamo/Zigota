@@ -21,7 +21,7 @@ pub const MimallocAllocator = std.mem.Allocator{
 };
 
 pub fn calculateAlignmentFromLog2(log2_align: u8) usize {
-    return @as(usize, 1) << @intCast(std.mem.Allocator.Log2Align, log2_align);
+    return @as(usize, 1) << @as(std.mem.Allocator.Log2Align, @intCast(log2_align));
 }
 
 fn alloc(
@@ -36,7 +36,7 @@ fn alloc(
     std.debug.assert(len > 0);
     const alignment = calculateAlignmentFromLog2(log2_align);
     const ptr = c.mi_malloc_aligned(len, alignment);
-    return @ptrCast([*]u8, ptr);
+    return @ptrCast(ptr);
 }
 
 fn resize(

@@ -62,9 +62,9 @@ pub const Instance = struct {
             .pNext = null,
             .flags = 0,
             .pApplicationInfo = application_info,
-            .enabledLayerCount = if (std.debug.runtime_safety) @intCast(u32, validation_layers.len) else 0,
+            .enabledLayerCount = if (std.debug.runtime_safety) @intCast(validation_layers.len) else 0,
             .ppEnabledLayerNames = if (std.debug.runtime_safety) &validation_layers else null,
-            .enabledExtensionCount = @intCast(u32, extensions.len),
+            .enabledExtensionCount = @intCast(extensions.len),
             .ppEnabledExtensionNames = extensions.ptr,
         };
 

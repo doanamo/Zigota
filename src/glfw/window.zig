@@ -6,8 +6,8 @@ const utility = @import("utility.zig");
 const log = utility.log_scoped;
 
 pub const WindowConfig = struct {
-    width: i32 = 1024,
-    height: i32 = 576,
+    width: u32 = 1024,
+    height: u32 = 576,
     resizable: bool = true,
 };
 
@@ -52,7 +52,7 @@ pub const Window = struct {
         c.glfwWindowHint(c.GLFW_RESIZABLE, if (config.resizable) c.GLFW_TRUE else c.GLFW_FALSE);
         c.glfwWindowHint(c.GLFW_VISIBLE, c.GLFW_FALSE);
 
-        self.handle = c.glfwCreateWindow(config.width, config.height, "", null, null);
+        self.handle = c.glfwCreateWindow(@intCast(config.width), @intCast(config.height), "", null, null);
         if (self.handle == null) {
             return error.FailedToCreateWindow;
         }
@@ -66,8 +66,8 @@ pub const Window = struct {
         var height: c_int = undefined;
         c.glfwGetFramebufferSize(self.handle, &width, &height);
 
-        self.width = @intCast(u32, width);
-        self.height = @intCast(u32, height);
+        self.width = @intCast(width);
+        self.height = @intCast(height);
         log.info("Created {}x{} window", .{ self.width, self.height });
     }
 
@@ -98,11 +98,11 @@ pub const Window = struct {
 };
 
 fn framebufferSizeCallback(window: ?*c.GLFWwindow, width: c_int, height: c_int) callconv(.C) void {
-    var self = @ptrCast(*Window, @alignCast(@alignOf(Window), c.glfwGetWindowUserPointer(window)));
+    var self: *Window = @ptrCast(@alignCast(c.glfwGetWindowUserPointer(window)));
 
     if (width > 0 and height > 0) {
-        self.width = @intCast(u32, width);
-        self.height = @intCast(u32, height);
+        self.width = @intCast(width);
+        self.height = @intCast(height);
         self.resized = !self.minimized;
         self.minimized = false;
     } else {
