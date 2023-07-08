@@ -1,3 +1,4 @@
 {
     "commentAnchors.workspace.excludeFiles": "**/{.git,.vscode,deps,zig-cache,zig-out}/**/*",
+    "cmake.configureOnOpen": false,
 }
