@@ -24,6 +24,7 @@ pub const Swapchain = struct {
     device: *Device = undefined,
     allocator: std.mem.Allocator = undefined,
 
+    images: std.ArrayListUnmanaged(c.VkImage) = .{},
     image_views: std.ArrayListUnmanaged(c.VkImageView) = .{},
     image_format: c.VkFormat = undefined,
     color_space: c.VkColorSpaceKHR = undefined,
@@ -47,7 +48,7 @@ pub const Swapchain = struct {
             return error.FailedToCreateSwapchain;
         };
 
-        self.createImageViews() catch {
+        self.createImageViews(false) catch {
             log.err("Failed to create image views", .{});
             return error.FailedToCreateImageViews;
         };
@@ -60,7 +61,7 @@ pub const Swapchain = struct {
 
     pub fn deinit(self: *Swapchain) void {
         self.destroyImageSynchronization();
-        self.destroyImageViews();
+        self.destroyImageViews(false);
         self.destroySwapchain();
         self.* = undefined;
     }
@@ -110,20 +111,19 @@ pub const Swapchain = struct {
         }
     }
 
-    fn createImageViews(self: *Swapchain) !void {
+    fn createImageViews(self: *Swapchain, recreating: bool) !void {
         log.info("Creating swapchain image views...", .{});
-        errdefer self.destroyImageViews();
+        errdefer self.destroyImageViews(recreating);
 
         var image_count: u32 = 0;
         try utility.checkResult(c.vkGetSwapchainImagesKHR.?(self.device.handle, self.handle, &image_count, null));
         self.max_inflight_frames = image_count;
 
-        const images = try self.allocator.alloc(c.VkImage, image_count);
-        defer self.allocator.free(images);
-        try utility.checkResult(c.vkGetSwapchainImagesKHR.?(self.device.handle, self.handle, &image_count, images.ptr));
+        try self.images.resize(self.allocator, image_count);
+        try utility.checkResult(c.vkGetSwapchainImagesKHR.?(self.device.handle, self.handle, &image_count, self.images.items.ptr));
 
         try self.image_views.ensureTotalCapacityPrecise(self.allocator, image_count);
-        for (images) |image| {
+        for (self.images.items) |image| {
             const create_info = &c.VkImageViewCreateInfo{
                 .sType = c.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                 .pNext = null,
@@ -152,13 +152,18 @@ pub const Swapchain = struct {
         }
     }
 
-    fn destroyImageViews(self: *Swapchain) void {
+    fn destroyImageViews(self: *Swapchain, recreating: bool) void {
         for (self.image_views.items) |image_view| {
             c.vkDestroyImageView.?(self.device.handle, image_view, memory.allocation_callbacks);
         }
 
-        self.image_views.deinit(self.allocator);
-        self.image_views = .{};
+        if (recreating) {
+            self.image_views.clearRetainingCapacity();
+            self.images.clearRetainingCapacity();
+        } else {
+            self.image_views.deinit(self.allocator);
+            self.images.deinit(self.allocator);
+        }
     }
 
     fn createImageSynchronization(self: *Swapchain) !void {
@@ -216,12 +221,12 @@ pub const Swapchain = struct {
     pub fn recreate(self: *Swapchain) !void {
         log.info("Recreating swapchain...", .{});
 
-        self.destroyImageViews();
+        self.destroyImageViews(true);
         self.destroySwapchain();
 
         try self.surface.updateCapabilities();
         try self.createSwapchain();
-        try self.createImageViews();
+        try self.createImageViews(true);
     }
 
     pub fn acquireNextImage(self: *Swapchain) !struct {
