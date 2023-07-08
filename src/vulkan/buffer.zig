@@ -7,39 +7,37 @@ const log = utility.log_scoped;
 const VmaAllocator = @import("vma.zig").VmaAllocator;
 
 pub const Buffer = struct {
-    pub const Config = struct {
-        element_size: u32,
-        element_count: u32,
-        usage: c.VkBufferUsageFlags,
+    pub const InitParams = struct {
+        size_bytes: usize,
+        usage_flags: c.VkBufferUsageFlags,
         sharing_mode: c.VkSharingMode = c.VK_SHARING_MODE_EXCLUSIVE,
         memory_usage: c.VmaMemoryUsage = c.VMA_MEMORY_USAGE_AUTO,
+        memory_flags: c.VmaPoolCreateFlags = 0,
     };
 
     handle: c.VkBuffer = null,
     allocation: c.VmaAllocation = null,
-    element_size: u32 = undefined,
-    element_count: u32 = undefined,
+    size_bytes: usize = 0,
 
-    pub fn init(self: *Buffer, vma: *VmaAllocator, config: *const Config) !void {
-        log.info("Creating buffer... (size {} bytes)", .{config.element_size * config.element_count});
-        self.element_size = config.element_size;
-        self.element_count = config.element_count;
+    pub fn init(self: *Buffer, vma: *VmaAllocator, params: *const InitParams) !void {
+        log.info("Creating buffer... (size {} bytes)", .{params.size_bytes});
+        self.size_bytes = params.size_bytes;
         errdefer self.deinit(vma);
 
         const buffer_create_info = &c.VkBufferCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             .pNext = null,
             .flags = 0,
-            .size = config.element_size * config.element_count,
-            .usage = config.usage,
-            .sharingMode = config.sharing_mode,
+            .size = params.size_bytes,
+            .usage = params.usage_flags,
+            .sharingMode = params.sharing_mode,
             .queueFamilyIndexCount = 0,
             .pQueueFamilyIndices = null,
         };
 
         const allocation_create_info = &c.VmaAllocationCreateInfo{
-            .flags = c.VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
-            .usage = config.memory_usage,
+            .flags = params.memory_flags,
+            .usage = params.memory_usage,
             .requiredFlags = 0,
             .preferredFlags = 0,
             .memoryTypeBits = 0,
@@ -48,7 +46,8 @@ pub const Buffer = struct {
             .priority = 0,
         };
 
-        try utility.checkResult(c.vmaCreateBuffer(vma.handle, buffer_create_info, allocation_create_info, &self.handle, &self.allocation, null));
+        var allocation_info: c.VmaAllocationInfo = undefined;
+        try utility.checkResult(c.vmaCreateBuffer(vma.handle, buffer_create_info, allocation_create_info, &self.handle, &self.allocation, &allocation_info));
     }
 
     pub fn deinit(self: *Buffer, vma: *VmaAllocator) void {
@@ -59,23 +58,28 @@ pub const Buffer = struct {
     }
 
     pub fn map(self: *Buffer, vma: *VmaAllocator, comptime T: type) ![]T {
-        std.debug.assert(self.element_size == @sizeOf(T));
+        std.debug.assert(self.size_bytes % @sizeOf(T) == 0);
 
         var data: ?*anyopaque = undefined;
         try utility.checkResult(c.vmaMapMemory(vma.handle, self.allocation, &data));
-        return @ptrCast([*]T, @alignCast(4, data))[0..self.element_count];
+        return @ptrCast([*]T, @alignCast(4, data))[0 .. self.size_bytes / @sizeOf(T)];
     }
 
     pub fn unmap(self: *Buffer, vma: *VmaAllocator) void {
         c.vmaUnmapMemory(vma.handle, self.allocation);
     }
 
-    pub fn upload(self: *Buffer, vma: *VmaAllocator, comptime T: type, elements: []const T) !void {
-        std.debug.assert(self.element_count >= elements.len);
+    pub fn upload(self: *Buffer, vma: *VmaAllocator, comptime T: type, elements: []const T, offset: usize) !void {
+        std.debug.assert(offset * @sizeOf(T) < self.size_bytes);
+        std.debug.assert(offset * @sizeOf(T) % 4 == 0);
 
-        var mapped_elements = try self.map(vma, T);
+        const mapped_elements = try self.map(vma, T);
         defer self.unmap(vma);
 
-        @memcpy(mapped_elements, elements);
+        @memcpy(mapped_elements[offset .. offset + elements.len], elements);
+    }
+
+    pub fn flush(self: *Buffer, vma: *VmaAllocator, offset: usize, size: usize) !void {
+        try utility.checkResult(c.vmaFlushAllocation(vma.handle, self.allocation, offset, size));
     }
 };

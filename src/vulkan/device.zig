@@ -130,7 +130,7 @@ pub const Device = struct {
         var queue_transfer = self.getQueue(.Transfer);
 
         const queue_priorities = [1]f32{1.0};
-        const queue_create_infos = &[3]c.VkDeviceQueueCreateInfo{
+        const queue_create_infos = [3]c.VkDeviceQueueCreateInfo{
             c.VkDeviceQueueCreateInfo{
                 .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
                 .pNext = null,
@@ -161,20 +161,32 @@ pub const Device = struct {
         const extensions = getExtensions();
         const features = std.mem.zeroes(c.VkPhysicalDeviceFeatures);
 
-        const create_info = &c.VkDeviceCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        var synchronization_features = c.VkPhysicalDeviceSynchronization2Features{
+            .sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES,
             .pNext = null,
+            .synchronization2 = c.VK_TRUE,
+        };
+
+        var timeline_semaphore_features = c.VkPhysicalDeviceTimelineSemaphoreFeatures{
+            .sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
+            .pNext = @ptrCast(*anyopaque, &synchronization_features),
+            .timelineSemaphore = c.VK_TRUE,
+        };
+
+        const create_info = c.VkDeviceCreateInfo{
+            .sType = c.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+            .pNext = &timeline_semaphore_features,
             .flags = 0,
             .queueCreateInfoCount = queue_create_infos.len,
-            .pQueueCreateInfos = queue_create_infos,
-            .enabledLayerCount = if (comptime std.debug.runtime_safety) @intCast(u32, validation_layers.len) else 0,
-            .ppEnabledLayerNames = if (comptime std.debug.runtime_safety) &validation_layers else null,
+            .pQueueCreateInfos = &queue_create_infos,
+            .enabledLayerCount = if (std.debug.runtime_safety) @intCast(u32, validation_layers.len) else 0,
+            .ppEnabledLayerNames = if (std.debug.runtime_safety) &validation_layers else null,
             .enabledExtensionCount = @intCast(u32, extensions.len),
             .ppEnabledExtensionNames = &extensions,
             .pEnabledFeatures = &features,
         };
 
-        try utility.checkResult(c.vkCreateDevice.?(physical_device.handle, create_info, memory.allocation_callbacks, &self.handle));
+        try utility.checkResult(c.vkCreateDevice.?(physical_device.handle, &create_info, memory.allocation_callbacks, &self.handle));
         c.volkLoadDevice(self.handle);
 
         c.vkGetDeviceQueue.?(self.handle, queue_graphics.index, 0, &queue_graphics.handle);

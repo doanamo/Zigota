@@ -44,6 +44,7 @@ pub const Renderer = struct {
             return error.FailedToCreateCommandBuffers;
         };
 
+        // TODO: Use dynamic rendering to get rid of render passes and framebuffers
         self.createRenderPass() catch {
             log.err("Failed to create render pass", .{});
             return error.FailedToCreateRenderPass;
@@ -93,7 +94,7 @@ pub const Renderer = struct {
 
         try self.command_pools.ensureTotalCapacityPrecise(self.allocator, self.vulkan.swapchain.max_inflight_frames);
         for (0..self.vulkan.swapchain.max_inflight_frames) |_| {
-            try self.command_pools.addOneAssumeCapacity().init(&self.vulkan.device, .Graphics);
+            try self.command_pools.addOneAssumeCapacity().init(&self.vulkan.device, &.{ .queue = .Graphics });
         }
     }
 
@@ -245,14 +246,12 @@ pub const Renderer = struct {
             },
         };
 
-        const buffer_config = &Buffer.Config{
-            .element_size = @sizeOf(ColorVertex),
-            .element_count = vertices.len,
-            .usage = c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-        };
+        try self.vertex_buffer.init(&self.vulkan.vma, &.{
+            .size_bytes = @sizeOf(ColorVertex) * vertices.len,
+            .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT | c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        });
 
-        try self.vertex_buffer.init(&self.vulkan.vma, buffer_config);
-        try self.vertex_buffer.upload(&self.vulkan.vma, ColorVertex, &vertices);
+        try self.vulkan.transfer.upload(&self.vertex_buffer, 0, std.mem.sliceAsBytes(&vertices));
     }
 
     fn destroyBuffers(self: *Renderer) void {
@@ -441,6 +440,8 @@ pub const Renderer = struct {
 
         try utility.checkResult(c.vkBeginCommandBuffer.?(command_buffer.handle, &command_buffer_begin_info));
 
+        self.vulkan.transfer.recordOwnershipTransfersToGraphicsQueue(command_buffer);
+
         var render_pass_begin_info = &c.VkRenderPassBeginInfo{
             .sType = c.VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
             .pNext = null,
@@ -494,13 +495,15 @@ pub const Renderer = struct {
         };
 
         c.vkCmdBindVertexBuffers.?(command_buffer.handle, 0, 1, vertex_buffers, vertex_offsets);
-        c.vkCmdDraw.?(command_buffer.handle, self.vertex_buffer.element_count, 1, 0, 0);
+        c.vkCmdDraw.?(command_buffer.handle, 3, 1, 0, 0);
 
         c.vkCmdEndRenderPass.?(command_buffer.handle);
         try utility.checkResult(c.vkEndCommandBuffer.?(command_buffer.handle));
     }
 
     pub fn render(self: *Renderer) !void {
+        try self.vulkan.transfer.submit();
+
         const image_next = self.vulkan.swapchain.acquireNextImage() catch |err| {
             if (err == error.SwapchainOutOfDate) {
                 try self.recreateSwapchain();
@@ -518,7 +521,13 @@ pub const Renderer = struct {
         try self.recordCommandBuffer(command_buffer, image_next.index);
 
         const submit_wait_semaphores = [_]c.VkSemaphore{
+            self.vulkan.transfer.finished_semaphore,
             image_next.available_semaphore,
+        };
+
+        const submit_wait_sempahore_values = [_]u64{
+            self.vulkan.transfer.finished_semaphore_index,
+            0,
         };
 
         const submit_wait_stages = [_]c.VkPipelineStageFlags{
@@ -533,9 +542,18 @@ pub const Renderer = struct {
             image_next.finished_semaphore,
         };
 
-        const submit_info = &c.VkSubmitInfo{
-            .sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        const timeline_semaphore_submit_info = c.VkTimelineSemaphoreSubmitInfo{
+            .sType = c.VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
             .pNext = null,
+            .waitSemaphoreValueCount = submit_wait_sempahore_values.len,
+            .pWaitSemaphoreValues = &submit_wait_sempahore_values,
+            .signalSemaphoreValueCount = 0,
+            .pSignalSemaphoreValues = null,
+        };
+
+        const submit_info = c.VkSubmitInfo{
+            .sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .pNext = &timeline_semaphore_submit_info,
             .waitSemaphoreCount = submit_wait_semaphores.len,
             .pWaitSemaphores = &submit_wait_semaphores,
             .pWaitDstStageMask = &submit_wait_stages,
@@ -545,7 +563,7 @@ pub const Renderer = struct {
             .pSignalSemaphores = &submit_signal_semaphores,
         };
 
-        try self.vulkan.device.submit(.Graphics, 1, submit_info, image_next.inflight_fence);
+        try self.vulkan.device.submit(.Graphics, 1, &submit_info, image_next.inflight_fence);
 
         const present_info = &c.VkPresentInfoKHR{
             .sType = c.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
