@@ -34,11 +34,6 @@ pub const Renderer = struct {
             return error.FailedToInitializeVulkan;
         };
 
-        self.createCommandPools() catch {
-            log.err("Failed to create command pools", .{});
-            return error.FailedToCreateCommandPools;
-        };
-
         self.createCommandBuffers() catch {
             log.err("Failed to create command buffers", .{});
             return error.FailedToCreateCommandBuffers;
@@ -76,7 +71,6 @@ pub const Renderer = struct {
         self.destroyFramebuffers();
         self.destroyRenderPass();
         self.destroyCommandBuffers();
-        self.destroyCommandPools();
 
         self.vulkan.deinit();
     }
@@ -89,25 +83,13 @@ pub const Renderer = struct {
         try self.createFramebuffers();
     }
 
-    fn createCommandPools(self: *Renderer) !void {
-        log.info("Creating command pools...", .{});
+    fn createCommandBuffers(self: *Renderer) !void {
+        log.info("Creating command buffers...", .{});
 
         try self.command_pools.ensureTotalCapacityPrecise(self.allocator, self.vulkan.swapchain.max_inflight_frames);
         for (0..self.vulkan.swapchain.max_inflight_frames) |_| {
             try self.command_pools.addOneAssumeCapacity().init(&self.vulkan.device, &.{ .queue = .Graphics });
         }
-    }
-
-    fn destroyCommandPools(self: *Renderer) void {
-        for (self.command_pools.items) |*command_pool| {
-            command_pool.deinit();
-        }
-
-        self.command_pools.deinit(self.allocator);
-    }
-
-    fn createCommandBuffers(self: *Renderer) !void {
-        log.info("Creating command buffers...", .{});
 
         try self.command_buffers.ensureTotalCapacityPrecise(self.allocator, self.vulkan.swapchain.max_inflight_frames);
         for (0..self.vulkan.swapchain.max_inflight_frames) |i| {
@@ -124,7 +106,12 @@ pub const Renderer = struct {
             command_buffer.deinit(&self.vulkan.device, &self.command_pools.items[i]);
         }
 
+        for (self.command_pools.items) |*command_pool| {
+            command_pool.deinit();
+        }
+
         self.command_buffers.deinit(self.allocator);
+        self.command_pools.deinit(self.allocator);
     }
 
     fn createRenderPass(self: *Renderer) !void {
