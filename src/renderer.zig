@@ -476,6 +476,7 @@ pub const Renderer = struct {
         };
 
         const submit_wait_stages = [_]c.VkPipelineStageFlags{
+            c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
             c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         };
 
