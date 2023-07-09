@@ -20,11 +20,9 @@ pub const Application = struct {
         self.allocator = allocator;
         errdefer self.deinit();
 
-        const title = std.fmt.comptimePrint("{s} {}.{}.{}", .{
+        const title = std.fmt.comptimePrint("{s} {}", .{
             root.project_name,
-            root.project_version.major,
-            root.project_version.minor,
-            root.project_version.patch,
+            root.project_version,
         });
 
         self.window.init(title, allocator) catch {

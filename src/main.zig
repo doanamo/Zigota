@@ -9,7 +9,7 @@ const Application = @import("application.zig").Application;
 
 pub var config = Config{};
 pub const project_name = "Zigota";
-pub const project_version = .{
+pub const project_version = std.SemanticVersion{
     .major = 0,
     .minor = 1,
     .patch = 0,
@@ -19,12 +19,7 @@ const allocator = memory.default_allocator;
 const log = std.log.scoped(.Main);
 
 pub fn main() !void {
-    log.info("Starting {s} {}.{}.{}...", .{
-        project_name,
-        project_version.major,
-        project_version.minor,
-        project_version.patch,
-    });
+    log.info("Starting {s} {}...", .{ project_name, project_version });
     log.debug("Debug logging enabled", .{});
 
     // Setup memory
