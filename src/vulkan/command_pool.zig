@@ -16,7 +16,7 @@ pub const CommandPool = struct {
     handle: c.VkCommandPool = null,
     device: *Device = undefined,
 
-    pub fn init(self: *CommandPool, device: *Device, params: *const InitParams) !void {
+    pub fn init(self: *CommandPool, device: *Device, params: InitParams) !void {
         self.device = device;
         errdefer self.deinit();
 
@@ -38,6 +38,14 @@ pub const CommandPool = struct {
             c.vkDestroyCommandPool.?(self.device.handle, self.handle, memory.allocation_callbacks);
         }
         self.* = undefined;
+    }
+
+    pub fn createBuffer(self: *CommandPool, level: c.VkCommandBufferLevel) !CommandBuffer {
+        var command_buffer = CommandBuffer{};
+        errdefer command_buffer.deinit(self.device, self);
+
+        try command_buffer.init(self.device, self, level);
+        return command_buffer;
     }
 
     pub fn reset(self: *CommandPool) !void {

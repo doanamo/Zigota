@@ -87,16 +87,17 @@ pub const Renderer = struct {
 
         try self.command_pools.ensureTotalCapacityPrecise(self.allocator, self.vulkan.swapchain.max_inflight_frames);
         for (0..self.vulkan.swapchain.max_inflight_frames) |_| {
-            try self.command_pools.addOneAssumeCapacity().init(&self.vulkan.device, &.{ .queue = .Graphics });
+            var command_pool = self.command_pools.addOneAssumeCapacity();
+            try command_pool.init(&self.vulkan.device, .{
+                .queue = .Graphics,
+                .flags = c.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+            });
         }
 
         try self.command_buffers.ensureTotalCapacityPrecise(self.allocator, self.vulkan.swapchain.max_inflight_frames);
-        for (0..self.vulkan.swapchain.max_inflight_frames) |i| {
-            try self.command_buffers.addOneAssumeCapacity().init(
-                &self.vulkan.device,
-                &self.command_pools.items[i],
-                c.VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-            );
+        for (self.command_pools.items) |*command_pool| {
+            var command_buffer = try command_pool.createBuffer(c.VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+            self.command_buffers.appendAssumeCapacity(command_buffer);
         }
     }
 

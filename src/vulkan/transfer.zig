@@ -67,7 +67,7 @@ pub const Transfer = struct {
     fn createCommandPool(self: *Transfer) !void {
         log.info("Creating transfer command pool", .{});
 
-        try self.command_pool.init(self.device, &.{
+        try self.command_pool.init(self.device, .{
             .queue = .Transfer,
             .flags = c.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
         });
