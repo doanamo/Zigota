@@ -88,11 +88,18 @@ pub const Window = struct {
     }
 
     pub fn updateTitle(self: *Window, fps_count: f32, frame_time: f32) !void {
-        self.setTitle(try std.fmt.bufPrintZ(self.title_buffer, "{s} - {s} - FPS: {d:.0} ({d:.2}ms)", .{
+        var physical_memory: usize = undefined;
+        var committed_memory: usize = undefined;
+        c.mi_process_info(null, null, null, &physical_memory, null, &committed_memory, null, null);
+
+        const format = "{s} - {s} - FPS: {d:.0} ({d:.2}ms) - RAM: {d:.2}MB (Committed: {d:.2}MB)";
+        self.setTitle(try std.fmt.bufPrintZ(self.title_buffer, format, .{
             self.title_initial,
             @tagName(builtin.mode),
             fps_count,
             frame_time * std.time.ms_per_s,
+            utility.toMegabytes(physical_memory),
+            utility.toMegabytes(committed_memory),
         }));
     }
 };
