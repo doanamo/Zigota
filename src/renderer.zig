@@ -30,6 +30,8 @@ pub const Renderer = struct {
     descriptor_sets: std.ArrayListUnmanaged(c.VkDescriptorSet) = .{},
     pipeline: c.VkPipeline = null,
 
+    time: f32 = 0.0,
+
     pub fn init(self: *Renderer, window: *Window, allocator: std.mem.Allocator) !void {
         log.info("Initializing...", .{});
         self.allocator = allocator;
@@ -130,7 +132,7 @@ pub const Renderer = struct {
 
         const vertices = [_]ColorVertex{
             ColorVertex{
-                .position = [3]f32{ 0.0, -0.5, 0.0 },
+                .position = [3]f32{ 0.5, -0.5, 0.0 },
                 .color = [4]f32{ 1.0, 0.0, 0.0, 1.0 },
             },
             ColorVertex{
@@ -142,16 +144,12 @@ pub const Renderer = struct {
                 .color = [4]f32{ 0.0, 0.0, 1.0, 1.0 },
             },
             ColorVertex{
-                .position = [3]f32{ 0.75, -0.5, 0.0 },
+                .position = [3]f32{ -0.5, -0.5, 0.0 },
                 .color = [4]f32{ 1.0, 1.0, 0.0, 1.0 },
-            },
-            ColorVertex{
-                .position = [3]f32{ -0.75, -0.5, 0.0 },
-                .color = [4]f32{ 1.0, 0.0, 1.0, 1.0 },
             },
         };
 
-        const indices = [_]u16{ 0, 1, 2, 3, 1, 0, 4, 0, 2 };
+        const indices = [_]u16{ 0, 1, 2, 2, 3, 0 };
 
         try self.vertex_buffer.init(&self.vulkan.vma, &.{
             .size_bytes = @sizeOf(ColorVertex) * vertices.len,
@@ -447,10 +445,16 @@ pub const Renderer = struct {
     }
 
     fn updateUniformBuffer(self: *Renderer, uniform_buffer: *Buffer) !void {
+        const window = self.vulkan.swapchain.window;
+        const width: f32 = @floatFromInt(window.width);
+        const height: f32 = @floatFromInt(window.height);
+
+        const camera_position = math.Vec3{ 0.0, 0.0, -1.0 };
+
         const uniform_object = VertexTransformUniform{
-            .model = math.identity(),
-            .view = math.identity(),
-            .projection = math.identity(),
+            .model = math.rotation(math.Vec3{ 0.0, 0.0, math.radians(30.0) * self.time }),
+            .view = math.translation(camera_position * math.splat3(-1.0)),
+            .projection = math.perspectiveFov(math.radians(90.0), width / height, 0.0001, 1000.0),
         };
 
         try uniform_buffer.upload(&self.vulkan.vma, std.mem.asBytes(&uniform_object), 0);
@@ -598,6 +602,10 @@ pub const Renderer = struct {
         c.vkCmdEndRendering.?(command_buffer.handle);
 
         try utility.checkResult(c.vkEndCommandBuffer.?(command_buffer.handle));
+    }
+
+    pub fn update(self: *Renderer, time_delta: f32) !void {
+        self.time += time_delta;
     }
 
     pub fn render(self: *Renderer) !void {

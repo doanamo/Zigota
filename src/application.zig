@@ -61,6 +61,8 @@ pub const Application = struct {
             try self.renderer.recreateSwapchain();
             self.window.resized = false;
         }
+
+        try self.renderer.update(time_delta);
     }
 
     pub fn render(self: *Application) !void {
