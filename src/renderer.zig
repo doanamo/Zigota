@@ -24,11 +24,11 @@ pub const Renderer = struct {
     uniform_buffers: std.ArrayListUnmanaged(Buffer) = .{},
     vertex_buffer: Buffer = .{},
     index_buffer: Buffer = .{},
+    layout_descriptor_set: c.VkDescriptorSetLayout = null,
+    layout_pipeline: c.VkPipelineLayout = null,
     descriptor_pool: DescriptorPool = .{},
-    descriptor_set_layout: c.VkDescriptorSetLayout = null,
     descriptor_sets: std.ArrayListUnmanaged(c.VkDescriptorSet) = .{},
-    pipeline_layout: c.VkPipelineLayout = null,
-    pipeline_graphics: c.VkPipeline = null,
+    pipeline: c.VkPipeline = null,
 
     pub fn init(self: *Renderer, window: *Window, allocator: std.mem.Allocator) !void {
         log.info("Initializing...", .{});
@@ -50,19 +50,19 @@ pub const Renderer = struct {
             return error.FailedToCreateBuffers;
         };
 
+        self.createLayouts() catch {
+            log.err("Failed to create layouts", .{});
+            return error.FailedToCreateLayouts;
+        };
+
         self.createDescriptors() catch {
             log.err("Failed to create descriptors", .{});
             return error.FailedToCreateDescriptors;
         };
 
-        self.createPipelineLayout() catch {
-            log.err("Failed to create pipeline layout", .{});
-            return error.FailedToCreatePipelineLayout;
-        };
-
-        self.createGraphicsPipeline() catch {
-            log.err("Failed to create graphics pipeline", .{});
-            return error.FailedToCreateGraphicsPipeline;
+        self.createPipeline() catch {
+            log.err("Failed to create pipeline", .{});
+            return error.FailedToCreatePipeline;
         };
     }
 
@@ -70,9 +70,9 @@ pub const Renderer = struct {
         log.info("Deinitializing...", .{});
 
         self.vulkan.device.waitIdle();
-        self.destroyGraphicsPipeline();
-        self.destroyPipelineLayout();
+        self.destroyPipeline();
         self.destroyDescriptors();
+        self.destroyLayouts();
         self.destroyBuffers();
         self.destroyCommandBuffers();
         self.vulkan.deinit();
@@ -177,6 +177,50 @@ pub const Renderer = struct {
         self.index_buffer.deinit(&self.vulkan.vma);
     }
 
+    fn createLayouts(self: *Renderer) !void {
+        log.info("Creating layouts...", .{});
+
+        const descriptor_set_layout_binding = c.VkDescriptorSetLayoutBinding{
+            .binding = 0,
+            .descriptorType = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = 1,
+            .stageFlags = c.VK_SHADER_STAGE_VERTEX_BIT,
+            .pImmutableSamplers = null,
+        };
+
+        const descriptor_set_layout_create_info = c.VkDescriptorSetLayoutCreateInfo{
+            .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .pNext = null,
+            .flags = 0,
+            .bindingCount = 1,
+            .pBindings = &descriptor_set_layout_binding,
+        };
+
+        try utility.checkResult(c.vkCreateDescriptorSetLayout.?(self.vulkan.device.handle, &descriptor_set_layout_create_info, memory.allocation_callbacks, &self.layout_descriptor_set));
+
+        const pipeline_layout_create_info = c.VkPipelineLayoutCreateInfo{
+            .sType = c.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+            .pNext = null,
+            .flags = 0,
+            .setLayoutCount = 1,
+            .pSetLayouts = &self.layout_descriptor_set,
+            .pushConstantRangeCount = 0,
+            .pPushConstantRanges = null,
+        };
+
+        try utility.checkResult(c.vkCreatePipelineLayout.?(self.vulkan.device.handle, &pipeline_layout_create_info, memory.allocation_callbacks, &self.layout_pipeline));
+    }
+
+    fn destroyLayouts(self: *Renderer) void {
+        if (self.layout_descriptor_set != null) {
+            c.vkDestroyDescriptorSetLayout.?(self.vulkan.device.handle, self.layout_descriptor_set, memory.allocation_callbacks);
+        }
+
+        if (self.layout_pipeline != null) {
+            c.vkDestroyPipelineLayout.?(self.vulkan.device.handle, self.layout_pipeline, memory.allocation_callbacks);
+        }
+    }
+
     fn createDescriptors(self: *Renderer) !void {
         log.info("Creating descriptors...", .{});
 
@@ -185,24 +229,6 @@ pub const Renderer = struct {
             .uniform_buffer_count = self.vulkan.swapchain.max_inflight_frames,
         });
 
-        const layout_binding = c.VkDescriptorSetLayoutBinding{
-            .binding = 0,
-            .descriptorType = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = 1,
-            .stageFlags = c.VK_SHADER_STAGE_VERTEX_BIT,
-            .pImmutableSamplers = null,
-        };
-
-        const layout_create_info = c.VkDescriptorSetLayoutCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .pNext = null,
-            .flags = 0,
-            .bindingCount = 1,
-            .pBindings = &layout_binding,
-        };
-
-        try utility.checkResult(c.vkCreateDescriptorSetLayout.?(self.vulkan.device.handle, &layout_create_info, memory.allocation_callbacks, &self.descriptor_set_layout));
-
         try self.descriptor_sets.ensureTotalCapacityPrecise(self.allocator, self.vulkan.swapchain.max_inflight_frames);
         for (0..self.vulkan.swapchain.max_inflight_frames) |i| {
             const set_allocate_info = c.VkDescriptorSetAllocateInfo{
@@ -210,7 +236,7 @@ pub const Renderer = struct {
                 .pNext = null,
                 .descriptorPool = self.descriptor_pool.handle,
                 .descriptorSetCount = 1,
-                .pSetLayouts = &self.descriptor_set_layout,
+                .pSetLayouts = &self.layout_descriptor_set,
             };
 
             var descriptor_set: c.VkDescriptorSet = undefined;
@@ -243,38 +269,11 @@ pub const Renderer = struct {
     fn destroyDescriptors(self: *Renderer) void {
         // Descriptors sets will be deallocated automatically when the descriptor pool is destroyed
         self.descriptor_sets.deinit(self.allocator);
-
-        if (self.descriptor_set_layout != null) {
-            c.vkDestroyDescriptorSetLayout.?(self.vulkan.device.handle, self.descriptor_set_layout, memory.allocation_callbacks);
-        }
-
         self.descriptor_pool.deinit();
     }
 
-    fn createPipelineLayout(self: *Renderer) !void {
-        log.info("Creating pipeline layout...", .{});
-
-        const pipeline_layout_create_info = c.VkPipelineLayoutCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-            .pNext = null,
-            .flags = 0,
-            .setLayoutCount = 1,
-            .pSetLayouts = &self.descriptor_set_layout,
-            .pushConstantRangeCount = 0,
-            .pPushConstantRanges = null,
-        };
-
-        try utility.checkResult(c.vkCreatePipelineLayout.?(self.vulkan.device.handle, &pipeline_layout_create_info, memory.allocation_callbacks, &self.pipeline_layout));
-    }
-
-    fn destroyPipelineLayout(self: *Renderer) void {
-        if (self.pipeline_layout != null) {
-            c.vkDestroyPipelineLayout.?(self.vulkan.device.handle, self.pipeline_layout, memory.allocation_callbacks);
-        }
-    }
-
-    fn createGraphicsPipeline(self: *Renderer) !void {
-        log.info("Creating graphics pipeline...", .{});
+    fn createPipeline(self: *Renderer) !void {
+        log.info("Creating pipeline...", .{});
 
         var vertex_shader_module = try ShaderModule.loadFromFile(
             &self.vulkan.device,
@@ -431,19 +430,19 @@ pub const Renderer = struct {
             .pDepthStencilState = null,
             .pColorBlendState = &color_blend_state_create_info,
             .pDynamicState = &dynamic_state_create_info,
-            .layout = self.pipeline_layout,
+            .layout = self.layout_pipeline,
             .renderPass = null,
             .subpass = 0,
             .basePipelineHandle = null,
             .basePipelineIndex = 0,
         };
 
-        try utility.checkResult(c.vkCreateGraphicsPipelines.?(self.vulkan.device.handle, null, 1, graphics_pipeline_create_info, memory.allocation_callbacks, &self.pipeline_graphics));
+        try utility.checkResult(c.vkCreateGraphicsPipelines.?(self.vulkan.device.handle, null, 1, graphics_pipeline_create_info, memory.allocation_callbacks, &self.pipeline));
     }
 
-    fn destroyGraphicsPipeline(self: *Renderer) void {
-        if (self.pipeline_graphics != null) {
-            c.vkDestroyPipeline.?(self.vulkan.device.handle, self.pipeline_graphics, memory.allocation_callbacks);
+    fn destroyPipeline(self: *Renderer) void {
+        if (self.pipeline != null) {
+            c.vkDestroyPipeline.?(self.vulkan.device.handle, self.pipeline, memory.allocation_callbacks);
         }
     }
 
@@ -563,9 +562,9 @@ pub const Renderer = struct {
         };
 
         c.vkCmdBeginRendering.?(command_buffer.handle, &rendering_info);
-        c.vkCmdBindPipeline.?(command_buffer.handle, c.VK_PIPELINE_BIND_POINT_GRAPHICS, self.pipeline_graphics);
+        c.vkCmdBindPipeline.?(command_buffer.handle, c.VK_PIPELINE_BIND_POINT_GRAPHICS, self.pipeline);
 
-        c.vkCmdBindDescriptorSets.?(command_buffer.handle, c.VK_PIPELINE_BIND_POINT_GRAPHICS, self.pipeline_layout, 0, 1, &self.descriptor_sets.items[frame_index], 0, null);
+        c.vkCmdBindDescriptorSets.?(command_buffer.handle, c.VK_PIPELINE_BIND_POINT_GRAPHICS, self.layout_pipeline, 0, 1, &self.descriptor_sets.items[frame_index], 0, null);
 
         c.vkCmdSetViewport.?(command_buffer.handle, 0, 1, &c.VkViewport{
             .x = 0.0,
