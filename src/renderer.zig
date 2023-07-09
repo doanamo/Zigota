@@ -10,6 +10,7 @@ const Vulkan = @import("vulkan.zig").Vulkan;
 const CommandPool = @import("vulkan/command_pool.zig").CommandPool;
 const CommandBuffer = @import("vulkan/command_buffer.zig").CommandBuffer;
 const Buffer = @import("vulkan/buffer.zig").Buffer;
+const DescriptorPool = @import("vulkan/descriptor_pool.zig").DescriptorPool;
 const ShaderModule = @import("vulkan/shader_module.zig").ShaderModule;
 const ColorVertex = @import("renderer/vertex_types.zig").ColorVertex;
 const VertexTransformUniform = @import("renderer/uniform_types.zig").VertexTransformUniform;
@@ -23,7 +24,7 @@ pub const Renderer = struct {
     uniform_buffers: std.ArrayListUnmanaged(Buffer) = .{},
     vertex_buffer: Buffer = .{},
     index_buffer: Buffer = .{},
-    descriptor_pool: c.VkDescriptorPool = null,
+    descriptor_pool: DescriptorPool = .{},
     descriptor_set_layout: c.VkDescriptorSetLayout = null,
     descriptor_sets: std.ArrayListUnmanaged(c.VkDescriptorSet) = .{},
     pipeline_layout: c.VkPipelineLayout = null,
@@ -119,7 +120,8 @@ pub const Renderer = struct {
 
         try self.uniform_buffers.ensureTotalCapacityPrecise(self.allocator, self.vulkan.swapchain.max_inflight_frames);
         for (0..self.vulkan.swapchain.max_inflight_frames) |_| {
-            try self.uniform_buffers.addOneAssumeCapacity().init(&self.vulkan.vma, &.{
+            var uniform_buffer = self.uniform_buffers.addOneAssumeCapacity();
+            try uniform_buffer.init(&self.vulkan.vma, &.{
                 .size_bytes = @sizeOf(VertexTransformUniform),
                 .usage_flags = c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 .memory_flags = c.VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | c.VMA_ALLOCATION_CREATE_MAPPED_BIT,
@@ -178,19 +180,10 @@ pub const Renderer = struct {
     fn createDescriptors(self: *Renderer) !void {
         log.info("Creating descriptors...", .{});
 
-        const pool_create_info = c.VkDescriptorPoolCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-            .pNext = null,
-            .flags = 0,
-            .maxSets = self.vulkan.swapchain.max_inflight_frames,
-            .poolSizeCount = 1,
-            .pPoolSizes = &c.VkDescriptorPoolSize{
-                .type = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .descriptorCount = self.vulkan.swapchain.max_inflight_frames,
-            },
-        };
-
-        try utility.checkResult(c.vkCreateDescriptorPool.?(self.vulkan.device.handle, &pool_create_info, memory.allocation_callbacks, &self.descriptor_pool));
+        try self.descriptor_pool.init(&self.vulkan.device, .{
+            .max_set_count = self.vulkan.swapchain.max_inflight_frames,
+            .uniform_buffer_count = self.vulkan.swapchain.max_inflight_frames,
+        });
 
         const layout_binding = c.VkDescriptorSetLayoutBinding{
             .binding = 0,
@@ -215,7 +208,7 @@ pub const Renderer = struct {
             const set_allocate_info = c.VkDescriptorSetAllocateInfo{
                 .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
                 .pNext = null,
-                .descriptorPool = self.descriptor_pool,
+                .descriptorPool = self.descriptor_pool.handle,
                 .descriptorSetCount = 1,
                 .pSetLayouts = &self.descriptor_set_layout,
             };
@@ -255,9 +248,7 @@ pub const Renderer = struct {
             c.vkDestroyDescriptorSetLayout.?(self.vulkan.device.handle, self.descriptor_set_layout, memory.allocation_callbacks);
         }
 
-        if (self.descriptor_pool != null) {
-            c.vkDestroyDescriptorPool.?(self.vulkan.device.handle, self.descriptor_pool, memory.allocation_callbacks);
-        }
+        self.descriptor_pool.deinit();
     }
 
     fn createPipelineLayout(self: *Renderer) !void {
