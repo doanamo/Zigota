@@ -57,26 +57,21 @@ pub const Buffer = struct {
         self.* = undefined;
     }
 
-    pub fn map(self: *Buffer, vma: *VmaAllocator, comptime T: type) ![]T {
-        std.debug.assert(self.size_bytes % @sizeOf(T) == 0);
-
+    pub fn map(self: *Buffer, vma: *VmaAllocator) ![]u8 {
         var data: ?*anyopaque = undefined;
         try utility.checkResult(c.vmaMapMemory(vma.handle, self.allocation, &data));
-        return @as([*]T, @ptrCast(@alignCast(data)))[0 .. self.size_bytes / @sizeOf(T)];
+        return @as([*]u8, @ptrCast(@alignCast(data)))[0..self.size_bytes];
     }
 
     pub fn unmap(self: *Buffer, vma: *VmaAllocator) void {
         c.vmaUnmapMemory(vma.handle, self.allocation);
     }
 
-    pub fn upload(self: *Buffer, vma: *VmaAllocator, comptime T: type, elements: []const T, offset: usize) !void {
-        std.debug.assert(offset * @sizeOf(T) < self.size_bytes);
-        std.debug.assert(offset * @sizeOf(T) % 4 == 0);
-
-        const mapped_elements = try self.map(vma, T);
+    pub fn upload(self: *Buffer, vma: *VmaAllocator, data: []const u8, offset: usize) !void {
+        const mapped_data = try self.map(vma);
         defer self.unmap(vma);
 
-        @memcpy(mapped_elements[offset .. offset + elements.len], elements);
+        @memcpy(mapped_data[offset .. offset + data.len], data);
     }
 
     pub fn flush(self: *Buffer, vma: *VmaAllocator, offset: usize, size: usize) !void {
