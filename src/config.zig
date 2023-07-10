@@ -2,10 +2,12 @@ const std = @import("std");
 const utility = @import("utility.zig");
 const log = std.log.scoped(.Config);
 
-const WindowConfig = @import("glfw/window.zig").WindowConfig;
+const WindowConfig = @import("glfw/window.zig").Window.Config;
+const VulkanConfig = @import("vulkan.zig").Vulkan.Config;
 
 pub const Config = struct {
     window: WindowConfig = .{},
+    vulkan: VulkanConfig = .{},
 
     pub fn init(self: *Config, allocator: std.mem.Allocator) !void {
         log.info("Loading config from file...", .{});

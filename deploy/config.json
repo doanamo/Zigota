@@ -3,5 +3,10 @@
         "width": 1024,
         "height": 576,
         "resizable": true
+    },
+    "vulkan": {
+        "swapchain": {
+            "present_mode": "Mailbox"
+        }
     }
 }

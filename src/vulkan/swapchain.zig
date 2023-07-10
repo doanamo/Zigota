@@ -1,4 +1,5 @@
 const std = @import("std");
+const root = @import("root");
 const c = @import("../c.zig");
 const utility = @import("utility.zig");
 const memory = @import("memory.zig");
@@ -16,7 +17,9 @@ pub const Swapchain = struct {
         FifoRelaxed = c.VK_PRESENT_MODE_FIFO_RELAXED_KHR,
     };
 
-    const present_mode = PresentMode.Immediate;
+    pub const Config = struct {
+        present_mode: PresentMode = .Immediate,
+    };
 
     handle: c.VkSwapchainKHR = null,
     window: *Window = undefined,
@@ -72,6 +75,8 @@ pub const Swapchain = struct {
         log.info("Creating swapchain...", .{});
         errdefer self.destroySwapchain();
 
+        const config = root.config.vulkan.swapchain;
+
         self.extent = c.VkExtent2D{
             .width = self.window.width,
             .height = self.window.height,
@@ -96,7 +101,7 @@ pub const Swapchain = struct {
             .pQueueFamilyIndices = null,
             .preTransform = self.surface.capabilities.currentTransform,
             .compositeAlpha = c.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-            .presentMode = @intFromEnum(present_mode),
+            .presentMode = @intFromEnum(config.present_mode),
             .clipped = c.VK_TRUE,
             .oldSwapchain = null,
         };

@@ -5,13 +5,13 @@ const c = @import("../c.zig");
 const utility = @import("utility.zig");
 const log = utility.log_scoped;
 
-pub const WindowConfig = struct {
-    width: u32 = 1024,
-    height: u32 = 576,
-    resizable: bool = true,
-};
-
 pub const Window = struct {
+    pub const Config = struct {
+        width: u32 = 1024,
+        height: u32 = 576,
+        resizable: bool = true,
+    };
+
     handle: ?*c.GLFWwindow = null,
     allocator: std.mem.Allocator = undefined,
     width: u32 = undefined,
