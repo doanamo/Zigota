@@ -7,15 +7,6 @@ pub fn init() !void {
     log.info("Initializing...", .{});
     errdefer deinit();
 
-    // TODO Waiting for GLFW 3.4.0
-    // allocator_callbacks = .{
-    //     .allocate = &allocateCallback,
-    //     .reallocate = &reallocateCallback,
-    //     .free = &freeCallback,
-    //     .user = null,
-    // };
-    // c.glfwInitAllocator(&allocator_callbacks);
-
     if (c.glfwInit() == c.GLFW_FALSE) {
         log.err("Failed to initialize library", .{});
         return error.FailedToInitializeGLFWLibrary;
