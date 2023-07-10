@@ -6,8 +6,8 @@ const WindowConfig = @import("glfw/window.zig").Window.Config;
 const VulkanConfig = @import("vulkan.zig").Vulkan.Config;
 
 pub const Config = struct {
-    window: WindowConfig = .{},
-    vulkan: VulkanConfig = .{},
+    window: WindowConfig = undefined,
+    vulkan: VulkanConfig = undefined,
 
     pub fn init(self: *Config, allocator: std.mem.Allocator) !void {
         log.info("Loading config from file...", .{});

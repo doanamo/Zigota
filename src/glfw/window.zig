@@ -7,9 +7,9 @@ const log = utility.log_scoped;
 
 pub const Window = struct {
     pub const Config = struct {
-        width: u32 = 1024,
-        height: u32 = 576,
-        resizable: bool = true,
+        width: u32,
+        height: u32,
+        resizable: bool,
     };
 
     handle: ?*c.GLFWwindow = null,

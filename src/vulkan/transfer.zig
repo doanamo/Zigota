@@ -1,4 +1,5 @@
 const std = @import("std");
+const root = @import("root");
 const c = @import("../c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
@@ -11,7 +12,9 @@ const CommandBuffer = @import("command_buffer.zig").CommandBuffer;
 const Buffer = @import("buffer.zig").Buffer;
 
 pub const Transfer = struct {
-    const staging_size = utility.kilobytes(64);
+    pub const Config = struct {
+        staging_size_kb: usize,
+    };
 
     const BufferCopyCommand = struct {
         buffer: c.VkBuffer = undefined,
@@ -27,6 +30,7 @@ pub const Transfer = struct {
     command_pool: CommandPool = .{},
     command_buffer: CommandBuffer = .{},
     staging_buffer: Buffer = .{},
+    staging_size: usize = 0,
     staging_offset: usize = 0,
     buffer_copy_commands: std.ArrayListUnmanaged(BufferCopyCommand) = .{},
     buffer_ownership_transfers_source: std.ArrayListUnmanaged(c.VkBufferMemoryBarrier2) = .{},
@@ -87,8 +91,11 @@ pub const Transfer = struct {
     fn createStagingBuffer(self: *Transfer) !void {
         log.info("Creating transfer staging buffer...", .{});
 
+        const config = root.config.vulkan.transfer;
+        self.staging_size = utility.fromKilobytes(config.staging_size_kb);
+
         try self.staging_buffer.init(self.vma, &.{
-            .size_bytes = staging_size,
+            .size_bytes = self.staging_size,
             .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             .memory_flags = c.VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | c.VMA_ALLOCATION_CREATE_MAPPED_BIT,
         });
@@ -131,7 +138,7 @@ pub const Transfer = struct {
 
         var data_offset: usize = 0;
         while (true) {
-            const staging_remaining_size = staging_size - self.staging_offset;
+            const staging_remaining_size = self.staging_size - self.staging_offset;
             if (staging_remaining_size == 0) {
                 // Staging buffer is already full and needs to be copied to GPU
                 // Submit queued buffer copies before we can stage more data

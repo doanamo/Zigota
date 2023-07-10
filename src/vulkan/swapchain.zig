@@ -18,7 +18,7 @@ pub const Swapchain = struct {
     };
 
     pub const Config = struct {
-        present_mode: PresentMode = .Immediate,
+        present_mode: PresentMode,
     };
 
     handle: c.VkSwapchainKHR = null,

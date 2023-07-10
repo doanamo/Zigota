@@ -15,7 +15,8 @@ const Transfer = @import("vulkan/transfer.zig").Transfer;
 
 pub const Vulkan = struct {
     pub const Config = struct {
-        swapchain: Swapchain.Config = .{},
+        swapchain: Swapchain.Config,
+        transfer: Transfer.Config,
     };
 
     allocator: std.mem.Allocator = undefined,
