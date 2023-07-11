@@ -56,6 +56,8 @@ pub const Surface = struct {
     }
 
     pub fn updateCapabilities(self: *Surface) !void {
+        // This is exposed because it needs to be called at least once
+        // after resizing window to avoid Vulkan validation layer errors
         try utility.checkResult(c.vkGetPhysicalDeviceSurfaceCapabilitiesKHR.?(self.physical_device.handle, self.handle, &self.capabilities));
     }
 };

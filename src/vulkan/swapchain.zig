@@ -235,11 +235,11 @@ pub const Swapchain = struct {
 
     pub fn recreate(self: *Swapchain) !void {
         log.info("Recreating swapchain...", .{});
+        try self.surface.updateCapabilities();
 
         self.destroyImageViews(true);
         self.destroySwapchain();
 
-        try self.surface.updateCapabilities();
         try self.createSwapchain();
         try self.createImageViews(true);
     }
