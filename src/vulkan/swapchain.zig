@@ -85,7 +85,17 @@ pub const Swapchain = struct {
         self.image_format = c.VK_FORMAT_B8G8R8A8_UNORM;
         self.color_space = c.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 
-        const create_info = &c.VkSwapchainCreateInfoKHR{
+        const present_mode = for (self.surface.present_modes) |supported_mode| {
+            const mode = @intFromEnum(config.present_mode);
+            if (supported_mode == mode) {
+                break mode;
+            }
+        } else blk: {
+            log.warn("Present mode {s} not supported, falling back to Fifo", .{@tagName(config.present_mode)});
+            break :blk c.VK_PRESENT_MODE_FIFO_KHR;
+        };
+
+        const create_info = c.VkSwapchainCreateInfoKHR{
             .sType = c.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
             .pNext = null,
             .flags = 0,
@@ -101,12 +111,12 @@ pub const Swapchain = struct {
             .pQueueFamilyIndices = null,
             .preTransform = self.surface.capabilities.currentTransform,
             .compositeAlpha = c.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-            .presentMode = @intFromEnum(config.present_mode),
+            .presentMode = present_mode,
             .clipped = c.VK_TRUE,
             .oldSwapchain = null,
         };
 
-        try utility.checkResult(c.vkCreateSwapchainKHR.?(self.device.handle, create_info, memory.allocation_callbacks, &self.handle));
+        try utility.checkResult(c.vkCreateSwapchainKHR.?(self.device.handle, &create_info, memory.allocation_callbacks, &self.handle));
     }
 
     fn destroySwapchain(self: *Swapchain) void {

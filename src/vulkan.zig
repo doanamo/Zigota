@@ -36,7 +36,7 @@ pub const Vulkan = struct {
 
         try self.instance.init(allocator);
         try self.physical_device.init(&self.instance, allocator);
-        try self.surface.init(window, &self.instance, &self.physical_device);
+        try self.surface.init(window, &self.instance, &self.physical_device, allocator);
         try self.device.init(&self.physical_device, &self.surface, allocator);
         try self.vma.init(&self.instance, &self.physical_device, &self.device);
         try self.swapchain.init(window, &self.surface, &self.device, allocator);
