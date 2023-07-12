@@ -319,64 +319,8 @@ pub const Renderer = struct {
         };
 
         try utility.checkResult(c.vkBeginCommandBuffer.?(command_buffer.handle, &command_buffer_begin_info));
-        self.vulkan.transfer.recordOwnershipTransfersToGraphicsQueue(command_buffer);
-
-        const color_attachment_layout_transition = c.VkImageMemoryBarrier2{
-            .sType = c.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-            .pNext = null,
-            .srcStageMask = c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-            .srcAccessMask = 0,
-            .dstStageMask = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .dstAccessMask = c.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            .oldLayout = c.VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            .srcQueueFamilyIndex = c.VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = c.VK_QUEUE_FAMILY_IGNORED,
-            .image = self.vulkan.swapchain.images.items[image_index],
-            .subresourceRange = c.VkImageSubresourceRange{
-                .aspectMask = c.VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-        };
-
-        const color_present_layout_transition = c.VkImageMemoryBarrier2{
-            .sType = c.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-            .pNext = null,
-            .srcStageMask = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .srcAccessMask = c.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            .dstStageMask = c.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-            .dstAccessMask = 0,
-            .oldLayout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            .newLayout = c.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-            .srcQueueFamilyIndex = c.VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = c.VK_QUEUE_FAMILY_IGNORED,
-            .image = self.vulkan.swapchain.images.items[image_index],
-            .subresourceRange = c.VkImageSubresourceRange{
-                .aspectMask = c.VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-        };
-
-        c.vkCmdPipelineBarrier2.?(command_buffer.handle, &c.VkDependencyInfo{
-            .sType = c.VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-            .pNext = null,
-            .dependencyFlags = 0,
-            .memoryBarrierCount = 0,
-            .pMemoryBarriers = null,
-            .bufferMemoryBarrierCount = 0,
-            .pBufferMemoryBarriers = null,
-            .imageMemoryBarrierCount = 2,
-            .pImageMemoryBarriers = &[_]c.VkImageMemoryBarrier2{
-                color_attachment_layout_transition,
-                color_present_layout_transition,
-            },
-        });
+        self.vulkan.transfer.recordOwnershipTransfers(command_buffer);
+        self.vulkan.swapchain.recordLayoutTransitions(command_buffer, image_index);
 
         const color_attachment_info = c.VkRenderingAttachmentInfo{
             .sType = c.VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,

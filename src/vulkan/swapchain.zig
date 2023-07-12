@@ -8,6 +8,7 @@ const log = utility.log_scoped;
 const Window = @import("../glfw/window.zig").Window;
 const Surface = @import("surface.zig").Surface;
 const Device = @import("device.zig").Device;
+const CommandBuffer = @import("command_buffer.zig").CommandBuffer;
 
 pub const Swapchain = struct {
     pub const PresentMode = enum(c.VkPresentModeKHR) {
@@ -275,6 +276,67 @@ pub const Swapchain = struct {
                 return error.SwapchainAcquireNextImageFailed;
             },
         }
+    }
+
+    pub fn recordLayoutTransitions(self: *Swapchain, command_buffer: *CommandBuffer, image_index: u32) void {
+        const color_attachment_layout_transition = c.VkImageMemoryBarrier2{
+            .sType = c.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .pNext = null,
+            .srcStageMask = c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            .srcAccessMask = 0,
+            .dstStageMask = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .dstAccessMask = c.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            .oldLayout = c.VK_IMAGE_LAYOUT_UNDEFINED,
+            .newLayout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            .srcQueueFamilyIndex = c.VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = c.VK_QUEUE_FAMILY_IGNORED,
+            .image = self.images.items[image_index],
+            .subresourceRange = c.VkImageSubresourceRange{
+                .aspectMask = c.VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+        };
+
+        const color_present_layout_transition = c.VkImageMemoryBarrier2{
+            .sType = c.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .pNext = null,
+            .srcStageMask = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .srcAccessMask = c.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            .dstStageMask = c.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+            .dstAccessMask = 0,
+            .oldLayout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            .newLayout = c.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            .srcQueueFamilyIndex = c.VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = c.VK_QUEUE_FAMILY_IGNORED,
+            .image = self.images.items[image_index],
+            .subresourceRange = c.VkImageSubresourceRange{
+                .aspectMask = c.VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+        };
+
+        const image_memory_barries = &[_]c.VkImageMemoryBarrier2{
+            color_attachment_layout_transition,
+            color_present_layout_transition,
+        };
+
+        c.vkCmdPipelineBarrier2.?(command_buffer.handle, &c.VkDependencyInfo{
+            .sType = c.VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .pNext = null,
+            .dependencyFlags = 0,
+            .memoryBarrierCount = 0,
+            .pMemoryBarriers = null,
+            .bufferMemoryBarrierCount = 0,
+            .pBufferMemoryBarriers = null,
+            .imageMemoryBarrierCount = image_memory_barries.len,
+            .pImageMemoryBarriers = image_memory_barries.ptr,
+        });
     }
 
     pub fn present(self: *Swapchain, present_info: *const c.VkPresentInfoKHR) !void {

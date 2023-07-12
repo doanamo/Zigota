@@ -280,7 +280,7 @@ pub const Transfer = struct {
         try utility.checkResult(c.vkWaitSemaphores.?(self.device.handle, &semaphore_wait_info, std.math.maxInt(u64)));
     }
 
-    pub fn recordOwnershipTransfersToGraphicsQueue(self: *Transfer, command_buffer: *CommandBuffer) void {
+    pub fn recordOwnershipTransfers(self: *Transfer, command_buffer: *CommandBuffer) void {
         if (self.buffer_ownership_transfers_target.items.len == 0)
             return;
 
