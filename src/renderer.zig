@@ -12,6 +12,9 @@ const CommandBuffer = @import("vulkan/command_buffer.zig").CommandBuffer;
 const Buffer = @import("vulkan/buffer.zig").Buffer;
 const DescriptorPool = @import("vulkan/descriptor_pool.zig").DescriptorPool;
 const ShaderModule = @import("vulkan/shader_module.zig").ShaderModule;
+const PipelineBuilder = @import("vulkan/pipeline.zig").PipelineBuilder;
+const Pipeline = @import("vulkan/pipeline.zig").Pipeline;
+
 const ColorVertex = @import("renderer/vertex_types.zig").ColorVertex;
 const VertexTransformUniform = @import("renderer/uniform_types.zig").VertexTransformUniform;
 
@@ -28,7 +31,7 @@ pub const Renderer = struct {
     layout_pipeline: c.VkPipelineLayout = null,
     descriptor_pool: DescriptorPool = .{},
     descriptor_sets: std.ArrayListUnmanaged(c.VkDescriptorSet) = .{},
-    pipeline: c.VkPipeline = null,
+    pipeline: Pipeline = .{},
 
     time: f32 = 0.0,
 
@@ -273,175 +276,21 @@ pub const Renderer = struct {
     fn createPipeline(self: *Renderer) !void {
         log.info("Creating pipeline...", .{});
 
-        var vertex_shader_module = try ShaderModule.loadFromFile(
-            &self.vulkan.device,
-            "data/shaders/simple.vert.spv",
-            self.allocator,
-        );
-        defer vertex_shader_module.deinit();
+        var builder = try PipelineBuilder.init(&self.vulkan.device, self.allocator);
+        defer builder.deinit();
 
-        const vertex_shader_stage_info = c.VkPipelineShaderStageCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .pNext = null,
-            .flags = 0,
-            .stage = c.VK_SHADER_STAGE_VERTEX_BIT,
-            .module = vertex_shader_module.handle,
-            .pName = "main",
-            .pSpecializationInfo = null,
-        };
+        try builder.loadShaderModule(.Vertex, "data/shaders/simple.vert.spv");
+        try builder.loadShaderModule(.Fragment, "data/shaders/simple.frag.spv");
 
-        var fragment_shader_module = try ShaderModule.loadFromFile(
-            &self.vulkan.device,
-            "data/shaders/simple.frag.spv",
-            self.allocator,
-        );
-        defer fragment_shader_module.deinit();
+        builder.setVertexInputType(ColorVertex);
+        builder.setColorAttachmentFormat(self.vulkan.swapchain.image_format);
+        builder.setPipelineLayout(self.layout_pipeline);
 
-        const fragment_shader_stage_info = c.VkPipelineShaderStageCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .pNext = null,
-            .flags = 0,
-            .stage = c.VK_SHADER_STAGE_FRAGMENT_BIT,
-            .module = fragment_shader_module.handle,
-            .pName = "main",
-            .pSpecializationInfo = null,
-        };
-
-        const shader_stages = [_]c.VkPipelineShaderStageCreateInfo{
-            vertex_shader_stage_info,
-            fragment_shader_stage_info,
-        };
-
-        const dynamic_states = [_]c.VkDynamicState{
-            c.VK_DYNAMIC_STATE_VIEWPORT,
-            c.VK_DYNAMIC_STATE_SCISSOR,
-        };
-
-        const dynamic_state_create_info = c.VkPipelineDynamicStateCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-            .pNext = null,
-            .flags = 0,
-            .dynamicStateCount = dynamic_states.len,
-            .pDynamicStates = &dynamic_states,
-        };
-
-        const vertex_input_state_create_info = c.VkPipelineVertexInputStateCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-            .pNext = null,
-            .flags = 0,
-            .vertexBindingDescriptionCount = 1,
-            .pVertexBindingDescriptions = &ColorVertex.binding_description,
-            .vertexAttributeDescriptionCount = ColorVertex.attribute_descriptions.len,
-            .pVertexAttributeDescriptions = &ColorVertex.attribute_descriptions[0],
-        };
-
-        const input_assembly_state_create_info = c.VkPipelineInputAssemblyStateCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-            .pNext = null,
-            .flags = 0,
-            .topology = c.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-            .primitiveRestartEnable = c.VK_FALSE,
-        };
-
-        const viewport_state_create_info = c.VkPipelineViewportStateCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-            .pNext = null,
-            .flags = 0,
-            .viewportCount = 1,
-            .pViewports = null,
-            .scissorCount = 1,
-            .pScissors = null,
-        };
-
-        const rasterization_state_create_info = c.VkPipelineRasterizationStateCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-            .pNext = null,
-            .flags = 0,
-            .depthClampEnable = c.VK_FALSE,
-            .rasterizerDiscardEnable = c.VK_FALSE,
-            .polygonMode = c.VK_POLYGON_MODE_FILL,
-            .cullMode = c.VK_CULL_MODE_BACK_BIT,
-            .frontFace = c.VK_FRONT_FACE_CLOCKWISE,
-            .depthBiasEnable = c.VK_FALSE,
-            .depthBiasConstantFactor = 0.0,
-            .depthBiasClamp = 0.0,
-            .depthBiasSlopeFactor = 0.0,
-            .lineWidth = 1.0,
-        };
-
-        const multisample_state_create_info = c.VkPipelineMultisampleStateCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-            .pNext = null,
-            .flags = 0,
-            .rasterizationSamples = c.VK_SAMPLE_COUNT_1_BIT,
-            .sampleShadingEnable = c.VK_FALSE,
-            .minSampleShading = 1.0,
-            .pSampleMask = null,
-            .alphaToCoverageEnable = c.VK_FALSE,
-            .alphaToOneEnable = c.VK_FALSE,
-        };
-
-        const color_blend_attachment_state = c.VkPipelineColorBlendAttachmentState{
-            .blendEnable = c.VK_FALSE,
-            .srcColorBlendFactor = c.VK_BLEND_FACTOR_ONE,
-            .dstColorBlendFactor = c.VK_BLEND_FACTOR_ZERO,
-            .colorBlendOp = c.VK_BLEND_OP_ADD,
-            .srcAlphaBlendFactor = c.VK_BLEND_FACTOR_ONE,
-            .dstAlphaBlendFactor = c.VK_BLEND_FACTOR_ZERO,
-            .alphaBlendOp = c.VK_BLEND_OP_ADD,
-            .colorWriteMask = c.VK_COLOR_COMPONENT_R_BIT | c.VK_COLOR_COMPONENT_G_BIT | c.VK_COLOR_COMPONENT_B_BIT | c.VK_COLOR_COMPONENT_A_BIT,
-        };
-
-        const color_blend_state_create_info = c.VkPipelineColorBlendStateCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-            .pNext = null,
-            .flags = 0,
-            .logicOpEnable = c.VK_FALSE,
-            .logicOp = c.VK_LOGIC_OP_COPY,
-            .attachmentCount = 1,
-            .pAttachments = &color_blend_attachment_state,
-            .blendConstants = [_]f32{ 0.0, 0.0, 0.0, 0.0 },
-        };
-
-        const pipeline_rendering_create_info = c.VkPipelineRenderingCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-            .pNext = null,
-            .viewMask = 0,
-            .colorAttachmentCount = 1,
-            .pColorAttachmentFormats = &self.vulkan.swapchain.image_format,
-            .depthAttachmentFormat = c.VK_FORMAT_UNDEFINED,
-            .stencilAttachmentFormat = c.VK_FORMAT_UNDEFINED,
-        };
-
-        const graphics_pipeline_create_info = &c.VkGraphicsPipelineCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-            .pNext = &pipeline_rendering_create_info,
-            .flags = 0,
-            .stageCount = shader_stages.len,
-            .pStages = &shader_stages,
-            .pVertexInputState = &vertex_input_state_create_info,
-            .pInputAssemblyState = &input_assembly_state_create_info,
-            .pTessellationState = null,
-            .pViewportState = &viewport_state_create_info,
-            .pRasterizationState = &rasterization_state_create_info,
-            .pMultisampleState = &multisample_state_create_info,
-            .pDepthStencilState = null,
-            .pColorBlendState = &color_blend_state_create_info,
-            .pDynamicState = &dynamic_state_create_info,
-            .layout = self.layout_pipeline,
-            .renderPass = null,
-            .subpass = 0,
-            .basePipelineHandle = null,
-            .basePipelineIndex = 0,
-        };
-
-        try utility.checkResult(c.vkCreateGraphicsPipelines.?(self.vulkan.device.handle, null, 1, graphics_pipeline_create_info, memory.allocation_callbacks, &self.pipeline));
+        self.pipeline = try builder.build();
     }
 
     fn destroyPipeline(self: *Renderer) void {
-        if (self.pipeline != null) {
-            c.vkDestroyPipeline.?(self.vulkan.device.handle, self.pipeline, memory.allocation_callbacks);
-        }
+        self.pipeline.deinit();
     }
 
     fn updateUniformBuffer(self: *Renderer, uniform_buffer: *Buffer) !void {
@@ -566,7 +415,7 @@ pub const Renderer = struct {
         };
 
         c.vkCmdBeginRendering.?(command_buffer.handle, &rendering_info);
-        c.vkCmdBindPipeline.?(command_buffer.handle, c.VK_PIPELINE_BIND_POINT_GRAPHICS, self.pipeline);
+        c.vkCmdBindPipeline.?(command_buffer.handle, c.VK_PIPELINE_BIND_POINT_GRAPHICS, self.pipeline.handle);
 
         c.vkCmdBindDescriptorSets.?(command_buffer.handle, c.VK_PIPELINE_BIND_POINT_GRAPHICS, self.layout_pipeline, 0, 1, &self.descriptor_sets.items[frame_index], 0, null);
 

@@ -6,6 +6,11 @@ const log = utility.log_scoped;
 
 const Device = @import("device.zig").Device;
 
+pub const ShaderStage = enum(c.VkShaderStageFlagBits) {
+    Vertex = c.VK_SHADER_STAGE_VERTEX_BIT,
+    Fragment = c.VK_SHADER_STAGE_FRAGMENT_BIT,
+};
+
 pub const ShaderModule = struct {
     const ByteCode = []align(@alignOf(u32)) u8;
 
