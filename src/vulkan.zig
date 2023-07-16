@@ -9,8 +9,8 @@ const Instance = @import("vulkan/instance.zig").Instance;
 const PhysicalDevice = @import("vulkan/physical_device.zig").PhysicalDevice;
 const Surface = @import("vulkan/surface.zig").Surface;
 const Device = @import("vulkan/device.zig").Device;
-const VmaAllocator = @import("vulkan/vma.zig").VmaAllocator;
 const Swapchain = @import("vulkan/swapchain.zig").Swapchain;
+const VmaAllocator = @import("vulkan/vma.zig").VmaAllocator;
 const Transfer = @import("vulkan/transfer.zig").Transfer;
 
 pub const Vulkan = struct {
@@ -25,8 +25,8 @@ pub const Vulkan = struct {
     physical_device: PhysicalDevice = .{},
     surface: Surface = .{},
     device: Device = .{},
-    vma: VmaAllocator = .{},
     swapchain: Swapchain = .{},
+    vma: VmaAllocator = .{},
     transfer: Transfer = .{},
 
     pub fn init(self: *Vulkan, window: *Window, allocator: std.mem.Allocator) !void {
@@ -38,8 +38,8 @@ pub const Vulkan = struct {
         try self.physical_device.init(&self.instance, allocator);
         try self.surface.init(window, &self.instance, &self.physical_device, allocator);
         try self.device.init(&self.physical_device, &self.surface, allocator);
-        try self.vma.init(&self.instance, &self.physical_device, &self.device);
         try self.swapchain.init(window, &self.surface, &self.device, allocator);
+        try self.vma.init(&self.instance, &self.physical_device, &self.device);
         try self.transfer.init(&self.device, &self.vma, allocator);
     }
 
@@ -48,8 +48,8 @@ pub const Vulkan = struct {
         self.device.waitIdle();
 
         self.transfer.deinit();
-        self.swapchain.deinit();
         self.vma.deinit();
+        self.swapchain.deinit();
         self.device.deinit();
         self.surface.deinit();
         self.physical_device.deinit();
