@@ -1,9 +1,9 @@
 const std = @import("std");
 const c = @import("c.zig");
-const log = std.log.scoped(.Renderer);
-const utility = @import("vulkan/utility.zig");
-const memory = @import("vulkan/memory.zig");
 const math = @import("math.zig");
+const memory = @import("vulkan/memory.zig");
+const utility = @import("vulkan/utility.zig");
+const log = std.log.scoped(.Renderer);
 
 const Window = @import("glfw/window.zig").Window;
 const Vulkan = @import("vulkan.zig").Vulkan;
@@ -19,8 +19,6 @@ const ColorVertex = @import("renderer/vertex_types.zig").ColorVertex;
 const VertexTransformUniform = @import("renderer/uniform_types.zig").VertexTransformUniform;
 
 pub const Renderer = struct {
-    allocator: std.mem.Allocator = undefined,
-
     vulkan: Vulkan = .{},
     command_pools: std.ArrayListUnmanaged(CommandPool) = .{},
     command_buffers: std.ArrayListUnmanaged(CommandBuffer) = .{},
@@ -35,12 +33,11 @@ pub const Renderer = struct {
 
     time: f32 = 0.0,
 
-    pub fn init(self: *Renderer, window: *Window, allocator: std.mem.Allocator) !void {
+    pub fn init(self: *Renderer, window: *Window) !void {
         log.info("Initializing...", .{});
-        self.allocator = allocator;
         errdefer self.deinit();
 
-        self.vulkan.init(window, allocator) catch {
+        self.vulkan.init(window) catch {
             log.err("Failed to initialize Vulkan", .{});
             return error.FailedToInitializeVulkan;
         };
@@ -91,7 +88,7 @@ pub const Renderer = struct {
     fn createCommandBuffers(self: *Renderer) !void {
         log.info("Creating command buffers...", .{});
 
-        try self.command_pools.ensureTotalCapacityPrecise(self.allocator, self.vulkan.swapchain.max_inflight_frames);
+        try self.command_pools.ensureTotalCapacityPrecise(memory.default_allocator, self.vulkan.swapchain.max_inflight_frames);
         for (0..self.vulkan.swapchain.max_inflight_frames) |_| {
             var command_pool = CommandPool{};
             try command_pool.init(&self.vulkan.device, .{
@@ -101,7 +98,7 @@ pub const Renderer = struct {
             self.command_pools.appendAssumeCapacity(command_pool);
         }
 
-        try self.command_buffers.ensureTotalCapacityPrecise(self.allocator, self.vulkan.swapchain.max_inflight_frames);
+        try self.command_buffers.ensureTotalCapacityPrecise(memory.default_allocator, self.vulkan.swapchain.max_inflight_frames);
         for (self.command_pools.items) |*command_pool| {
             var command_buffer = try command_pool.createBuffer(c.VK_COMMAND_BUFFER_LEVEL_PRIMARY);
             self.command_buffers.appendAssumeCapacity(command_buffer);
@@ -117,14 +114,14 @@ pub const Renderer = struct {
             command_pool.deinit();
         }
 
-        self.command_buffers.deinit(self.allocator);
-        self.command_pools.deinit(self.allocator);
+        self.command_buffers.deinit(memory.default_allocator);
+        self.command_pools.deinit(memory.default_allocator);
     }
 
     fn createBuffers(self: *Renderer) !void {
         log.info("Creating buffers...", .{});
 
-        try self.uniform_buffers.ensureTotalCapacityPrecise(self.allocator, self.vulkan.swapchain.max_inflight_frames);
+        try self.uniform_buffers.ensureTotalCapacityPrecise(memory.default_allocator, self.vulkan.swapchain.max_inflight_frames);
         for (0..self.vulkan.swapchain.max_inflight_frames) |_| {
             var uniform_buffer = Buffer{};
             try uniform_buffer.init(&self.vulkan.vma, .{
@@ -174,7 +171,7 @@ pub const Renderer = struct {
         for (self.uniform_buffers.items) |*uniform_buffer| {
             uniform_buffer.deinit(&self.vulkan.vma);
         }
-        self.uniform_buffers.deinit(self.allocator);
+        self.uniform_buffers.deinit(memory.default_allocator);
 
         self.vertex_buffer.deinit(&self.vulkan.vma);
         self.index_buffer.deinit(&self.vulkan.vma);
@@ -232,7 +229,7 @@ pub const Renderer = struct {
             .uniform_buffer_count = self.vulkan.swapchain.max_inflight_frames,
         });
 
-        try self.descriptor_sets.ensureTotalCapacityPrecise(self.allocator, self.vulkan.swapchain.max_inflight_frames);
+        try self.descriptor_sets.ensureTotalCapacityPrecise(memory.default_allocator, self.vulkan.swapchain.max_inflight_frames);
         for (0..self.vulkan.swapchain.max_inflight_frames) |i| {
             const set_allocate_info = c.VkDescriptorSetAllocateInfo{
                 .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -271,14 +268,14 @@ pub const Renderer = struct {
 
     fn destroyDescriptors(self: *Renderer) void {
         // Descriptors sets will be deallocated automatically when the descriptor pool is destroyed
-        self.descriptor_sets.deinit(self.allocator);
+        self.descriptor_sets.deinit(memory.default_allocator);
         self.descriptor_pool.deinit();
     }
 
     fn createPipeline(self: *Renderer) !void {
         log.info("Creating pipeline...", .{});
 
-        var builder = try PipelineBuilder.init(&self.vulkan.device, self.allocator);
+        var builder = try PipelineBuilder.init(&self.vulkan.device);
         defer builder.deinit();
 
         try builder.loadShaderModule(.Vertex, "data/shaders/simple.vert.spv");

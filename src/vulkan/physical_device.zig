@@ -1,5 +1,6 @@
 const std = @import("std");
 const c = @import("../c.zig");
+const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const log = utility.log_scoped;
 
@@ -10,10 +11,10 @@ pub const PhysicalDevice = struct {
     properties: c.VkPhysicalDeviceProperties = undefined,
     features: c.VkPhysicalDeviceFeatures = undefined,
 
-    pub fn init(self: *PhysicalDevice, instance: *Instance, allocator: std.mem.Allocator) !void {
+    pub fn init(self: *PhysicalDevice, instance: *Instance) !void {
         errdefer self.deinit();
 
-        self.selectPhysicalDevice(instance, allocator) catch {
+        self.selectPhysicalDevice(instance) catch {
             log.err("Failed to select physical device", .{});
             return error.FailedToSelectPhysicalDevice;
         };
@@ -24,7 +25,7 @@ pub const PhysicalDevice = struct {
         self.* = undefined;
     }
 
-    fn selectPhysicalDevice(self: *PhysicalDevice, instance: *const Instance, allocator: std.mem.Allocator) !void {
+    fn selectPhysicalDevice(self: *PhysicalDevice, instance: *const Instance) !void {
         // Simplified physical device selection - select first that is dedictated GPU
         log.info("Selecting physical device...", .{});
 
@@ -35,8 +36,8 @@ pub const PhysicalDevice = struct {
             return error.NoAvailableDevices;
         }
 
-        const physical_devices = try allocator.alloc(c.VkPhysicalDevice, physical_device_count);
-        defer allocator.free(physical_devices);
+        const physical_devices = try memory.default_allocator.alloc(c.VkPhysicalDevice, physical_device_count);
+        defer memory.default_allocator.free(physical_devices);
         try utility.checkResult(c.vkEnumeratePhysicalDevices.?(instance.handle, &physical_device_count, physical_devices.ptr));
 
         const PhysicalDeviceCandidate = struct {
@@ -45,8 +46,8 @@ pub const PhysicalDevice = struct {
             features: c.VkPhysicalDeviceFeatures,
         };
 
-        const physical_device_candidates = try allocator.alloc(PhysicalDeviceCandidate, physical_device_count);
-        defer allocator.free(physical_device_candidates);
+        const physical_device_candidates = try memory.default_allocator.alloc(PhysicalDeviceCandidate, physical_device_count);
+        defer memory.default_allocator.free(physical_device_candidates);
 
         for (physical_devices, 0..) |available_device, i| {
             physical_device_candidates[i].device = available_device;

@@ -12,10 +12,10 @@ pub const Instance = struct {
     handle: c.VkInstance = null,
     debug_callback: c.VkDebugReportCallbackEXT = null,
 
-    pub fn init(self: *Instance, allocator: std.mem.Allocator) !void {
+    pub fn init(self: *Instance) !void {
         errdefer self.deinit();
 
-        self.createInstance(allocator) catch {
+        self.createInstance() catch {
             log.err("Failed to create instance", .{});
             return error.FailedToCreateInstance;
         };
@@ -32,7 +32,7 @@ pub const Instance = struct {
         self.* = undefined;
     }
 
-    fn createInstance(self: *Instance, allocator: std.mem.Allocator) !void {
+    fn createInstance(self: *Instance) !void {
         log.info("Creating instance...", .{});
 
         try utility.checkResult(c.volkInitialize());
@@ -54,8 +54,8 @@ pub const Instance = struct {
         };
 
         const validation_layers = getValidationLayers();
-        const extensions = try getExtensions(allocator);
-        defer allocator.free(extensions);
+        const extensions = try getExtensions();
+        defer memory.default_allocator.free(extensions);
 
         const create_info = c.VkInstanceCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
@@ -118,8 +118,8 @@ pub const Instance = struct {
         };
     }
 
-    pub fn getExtensions(allocator: std.mem.Allocator) ![][*c]const u8 {
-        var extensions = std.ArrayList([*c]const u8).init(allocator);
+    pub fn getExtensions() ![][*c]const u8 {
+        var extensions = std.ArrayList([*c]const u8).init(memory.default_allocator);
         defer extensions.deinit();
 
         var glfw_extension_count: u32 = 0;

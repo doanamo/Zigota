@@ -1,7 +1,7 @@
 const std = @import("std");
 const c = @import("../c.zig");
-const utility = @import("utility.zig");
 const memory = @import("memory.zig");
+const utility = @import("utility.zig");
 
 const Device = @import("device.zig").Device;
 const ShaderStage = @import("shader_module.zig").ShaderStage;
@@ -13,7 +13,6 @@ pub const PipelineBuilder = struct {
         module: ShaderModule,
     });
 
-    allocator: std.mem.Allocator,
     device: *Device,
 
     shader_stages: ShaderStages,
@@ -24,11 +23,10 @@ pub const PipelineBuilder = struct {
     stencil_attachment_format: c.VkFormat = c.VK_FORMAT_UNDEFINED,
     pipeline_layout: c.VkPipelineLayout = null,
 
-    pub fn init(device: *Device, allocator: std.mem.Allocator) !PipelineBuilder {
+    pub fn init(device: *Device) !PipelineBuilder {
         return PipelineBuilder{
-            .allocator = allocator,
             .device = device,
-            .shader_stages = try ShaderStages.initCapacity(allocator, @typeInfo(ShaderStage).Enum.fields.len),
+            .shader_stages = try ShaderStages.initCapacity(memory.default_allocator, @typeInfo(ShaderStage).Enum.fields.len),
         };
     }
 
@@ -36,14 +34,14 @@ pub const PipelineBuilder = struct {
         for (self.shader_stages.items) |*shader_stage| {
             shader_stage.module.deinit();
         }
-        self.shader_stages.deinit(self.allocator);
+        self.shader_stages.deinit(memory.default_allocator);
     }
 
     pub fn loadShaderModule(self: *PipelineBuilder, shader_stage: ShaderStage, path: []const u8) !void {
-        var shader_module = try ShaderModule.loadFromFile(self.device, path, self.allocator);
+        var shader_module = try ShaderModule.loadFromFile(self.device, path);
         errdefer shader_module.deinit();
 
-        try self.shader_stages.append(self.allocator, .{
+        try self.shader_stages.append(memory.default_allocator, .{
             .stage = shader_stage,
             .module = shader_module,
         });
@@ -71,8 +69,8 @@ pub const PipelineBuilder = struct {
     }
 
     pub fn build(self: *PipelineBuilder) !Pipeline {
-        var shader_stage_create_infos = try self.allocator.alloc(c.VkPipelineShaderStageCreateInfo, self.shader_stages.items.len);
-        defer self.allocator.free(shader_stage_create_infos);
+        var shader_stage_create_infos = try memory.default_allocator.alloc(c.VkPipelineShaderStageCreateInfo, self.shader_stages.items.len);
+        defer memory.default_allocator.free(shader_stage_create_infos);
 
         for (self.shader_stages.items, 0..) |shader_stage, i| {
             shader_stage_create_infos[i] = .{

@@ -1,23 +1,21 @@
 const std = @import("std");
 const root = @import("root");
 const builtin = @import("builtin");
+const memory = @import("memory");
 const log = std.log.scoped(.Application);
 
 const Window = @import("glfw/window.zig").Window;
 const Renderer = @import("renderer.zig").Renderer;
 
 pub const Application = struct {
-    allocator: std.mem.Allocator = undefined,
-
     window: Window = .{},
     renderer: Renderer = .{},
 
     fps_count: u32 = 0,
     fps_time: f32 = 0.0,
 
-    pub fn init(self: *Application, allocator: std.mem.Allocator) !void {
+    pub fn init(self: *Application) !void {
         log.info("Initializing...", .{});
-        self.allocator = allocator;
         errdefer self.deinit();
 
         const title = std.fmt.comptimePrint("{s} {}", .{
@@ -25,12 +23,12 @@ pub const Application = struct {
             root.project_version,
         });
 
-        self.window.init(title, allocator) catch {
+        self.window.init(title) catch {
             log.err("Failed to initialize window", .{});
             return error.FailedToInitializeWindow;
         };
 
-        self.renderer.init(&self.window, allocator) catch {
+        self.renderer.init(&self.window) catch {
             log.err("Failed to initialize renderer", .{});
             return error.FailedToInitializeRenderer;
         };

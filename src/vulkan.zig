@@ -19,8 +19,6 @@ pub const Vulkan = struct {
         transfer: Transfer.Config,
     };
 
-    allocator: std.mem.Allocator = undefined,
-
     instance: Instance = .{},
     physical_device: PhysicalDevice = .{},
     surface: Surface = .{},
@@ -29,18 +27,17 @@ pub const Vulkan = struct {
     vma: VmaAllocator = .{},
     transfer: Transfer = .{},
 
-    pub fn init(self: *Vulkan, window: *Window, allocator: std.mem.Allocator) !void {
+    pub fn init(self: *Vulkan, window: *Window) !void {
         log.info("Initializing...", .{});
-        self.allocator = allocator;
         errdefer self.deinit();
 
-        try self.instance.init(allocator);
-        try self.physical_device.init(&self.instance, allocator);
-        try self.surface.init(window, &self.instance, &self.physical_device, allocator);
-        try self.device.init(&self.physical_device, &self.surface, allocator);
-        try self.swapchain.init(window, &self.surface, &self.device, allocator);
+        try self.instance.init();
+        try self.physical_device.init(&self.instance);
+        try self.surface.init(window, &self.instance, &self.physical_device);
+        try self.device.init(&self.physical_device, &self.surface);
+        try self.swapchain.init(window, &self.surface, &self.device);
         try self.vma.init(&self.instance, &self.physical_device, &self.device);
-        try self.transfer.init(&self.device, &self.vma, allocator);
+        try self.transfer.init(&self.device, &self.vma);
     }
 
     pub fn deinit(self: *Vulkan) void {

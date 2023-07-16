@@ -27,10 +27,10 @@ pub const Device = struct {
     handle: c.VkDevice = null,
     queues: [queue_type_count]Queue = undefined,
 
-    pub fn init(self: *Device, physical_device: *const PhysicalDevice, surface: *Surface, allocator: std.mem.Allocator) !void {
+    pub fn init(self: *Device, physical_device: *const PhysicalDevice, surface: *Surface) !void {
         errdefer self.deinit();
 
-        self.selectQueueFamilies(physical_device, surface, allocator) catch {
+        self.selectQueueFamilies(physical_device, surface) catch {
             log.err("Failed to select queue families", .{});
             return error.FailedToSelectQueueFamilies;
         };
@@ -47,14 +47,14 @@ pub const Device = struct {
         self.* = undefined;
     }
 
-    fn selectQueueFamilies(self: *Device, physical_device: *const PhysicalDevice, surface: *const Surface, allocator: std.mem.Allocator) !void {
+    fn selectQueueFamilies(self: *Device, physical_device: *const PhysicalDevice, surface: *const Surface) !void {
         log.info("Selecting queue families...", .{});
 
         var queue_family_count: u32 = 0;
         c.vkGetPhysicalDeviceQueueFamilyProperties.?(physical_device.handle, &queue_family_count, null);
 
-        const queue_families = try allocator.alloc(c.VkQueueFamilyProperties, queue_family_count);
-        defer allocator.free(queue_families);
+        const queue_families = try memory.default_allocator.alloc(c.VkQueueFamilyProperties, queue_family_count);
+        defer memory.default_allocator.free(queue_families);
         c.vkGetPhysicalDeviceQueueFamilyProperties.?(physical_device.handle, &queue_family_count, queue_families.ptr);
 
         var queue_graphics = self.getQueue(.Graphics);

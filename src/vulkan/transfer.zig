@@ -25,7 +25,6 @@ pub const Transfer = struct {
 
     device: *Device = undefined,
     vma: *VmaAllocator = undefined,
-    allocator: std.mem.Allocator = undefined,
 
     command_pool: CommandPool = .{},
     command_buffer: CommandBuffer = .{},
@@ -38,11 +37,10 @@ pub const Transfer = struct {
     finished_semaphore: c.VkSemaphore = null,
     finished_semaphore_index: u64 = 0,
 
-    pub fn init(self: *Transfer, device: *Device, vma: *VmaAllocator, allocator: std.mem.Allocator) !void {
+    pub fn init(self: *Transfer, device: *Device, vma: *VmaAllocator) !void {
         log.info("Initializing transfer...", .{});
         self.device = device;
         self.vma = vma;
-        self.allocator = allocator;
         errdefer self.deinit();
 
         self.createCommandPool() catch {
@@ -102,9 +100,9 @@ pub const Transfer = struct {
     }
 
     fn destroyStagingBuffer(self: *Transfer) void {
-        self.buffer_copy_commands.deinit(self.allocator);
-        self.buffer_ownership_transfers_source.deinit(self.allocator);
-        self.buffer_ownership_transfers_target.deinit(self.allocator);
+        self.buffer_copy_commands.deinit(memory.default_allocator);
+        self.buffer_ownership_transfers_source.deinit(memory.default_allocator);
+        self.buffer_ownership_transfers_target.deinit(memory.default_allocator);
         self.staging_buffer.deinit(self.vma);
     }
 
@@ -159,7 +157,7 @@ pub const Transfer = struct {
             const data_upload_size = @min(data_remaining_size, staging_remaining_size);
             try self.staging_buffer.upload(self.vma, data[data_offset .. data_offset + data_upload_size], self.staging_offset);
 
-            try self.buffer_copy_commands.append(self.allocator, BufferCopyCommand{
+            try self.buffer_copy_commands.append(memory.default_allocator, BufferCopyCommand{
                 .buffer = buffer.handle,
                 .buffer_offset = buffer_offset + data_offset,
                 .staging_offset = self.staging_offset,
@@ -170,7 +168,7 @@ pub const Transfer = struct {
             self.staging_offset += data_upload_size;
         }
 
-        try self.buffer_ownership_transfers_source.append(self.allocator, c.VkBufferMemoryBarrier2{
+        try self.buffer_ownership_transfers_source.append(memory.default_allocator, c.VkBufferMemoryBarrier2{
             .sType = c.VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
             .pNext = null,
             .srcStageMask = c.VK_PIPELINE_STAGE_2_TRANSFER_BIT,
@@ -184,7 +182,7 @@ pub const Transfer = struct {
             .size = c.VK_WHOLE_SIZE,
         });
 
-        try self.buffer_ownership_transfers_target.append(self.allocator, c.VkBufferMemoryBarrier2{
+        try self.buffer_ownership_transfers_target.append(memory.default_allocator, c.VkBufferMemoryBarrier2{
             .sType = c.VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
             .pNext = null,
             .srcStageMask = 0,

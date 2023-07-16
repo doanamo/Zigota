@@ -26,7 +26,6 @@ pub const Swapchain = struct {
     window: *Window = undefined,
     surface: *Surface = undefined,
     device: *Device = undefined,
-    allocator: std.mem.Allocator = undefined,
 
     images: std.ArrayListUnmanaged(c.VkImage) = .{},
     image_views: std.ArrayListUnmanaged(c.VkImageView) = .{},
@@ -40,11 +39,10 @@ pub const Swapchain = struct {
     frame_inflight_fences: std.ArrayListUnmanaged(c.VkFence) = .{},
     frame_index: u32 = 0,
 
-    pub fn init(self: *Swapchain, window: *Window, surface: *Surface, device: *Device, allocator: std.mem.Allocator) !void {
+    pub fn init(self: *Swapchain, window: *Window, surface: *Surface, device: *Device) !void {
         self.window = window;
         self.surface = surface;
         self.device = device;
-        self.allocator = allocator;
         errdefer self.deinit();
 
         self.createSwapchain() catch {
@@ -135,10 +133,10 @@ pub const Swapchain = struct {
         try utility.checkResult(c.vkGetSwapchainImagesKHR.?(self.device.handle, self.handle, &image_count, null));
         self.max_inflight_frames = image_count;
 
-        try self.images.resize(self.allocator, image_count);
+        try self.images.resize(memory.default_allocator, image_count);
         try utility.checkResult(c.vkGetSwapchainImagesKHR.?(self.device.handle, self.handle, &image_count, self.images.items.ptr));
 
-        try self.image_views.ensureTotalCapacityPrecise(self.allocator, image_count);
+        try self.image_views.ensureTotalCapacityPrecise(memory.default_allocator, image_count);
         for (self.images.items) |image| {
             const create_info = &c.VkImageViewCreateInfo{
                 .sType = c.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -164,7 +162,7 @@ pub const Swapchain = struct {
 
             var image_view: c.VkImageView = null;
             try utility.checkResult(c.vkCreateImageView.?(self.device.handle, create_info, memory.allocation_callbacks, &image_view));
-            try self.image_views.append(self.allocator, image_view);
+            try self.image_views.append(memory.default_allocator, image_view);
         }
     }
 
@@ -177,17 +175,17 @@ pub const Swapchain = struct {
             self.image_views.clearRetainingCapacity();
             self.images.clearRetainingCapacity();
         } else {
-            self.image_views.deinit(self.allocator);
-            self.images.deinit(self.allocator);
+            self.image_views.deinit(memory.default_allocator);
+            self.images.deinit(memory.default_allocator);
         }
     }
 
     fn createImageSynchronization(self: *Swapchain) !void {
         log.info("Creating swapchain image synchronization...", .{});
 
-        try self.image_available_semaphores.ensureTotalCapacityPrecise(self.allocator, self.max_inflight_frames);
-        try self.frame_finished_semaphores.ensureTotalCapacityPrecise(self.allocator, self.max_inflight_frames);
-        try self.frame_inflight_fences.ensureTotalCapacityPrecise(self.allocator, self.max_inflight_frames);
+        try self.image_available_semaphores.ensureTotalCapacityPrecise(memory.default_allocator, self.max_inflight_frames);
+        try self.frame_finished_semaphores.ensureTotalCapacityPrecise(memory.default_allocator, self.max_inflight_frames);
+        try self.frame_inflight_fences.ensureTotalCapacityPrecise(memory.default_allocator, self.max_inflight_frames);
 
         for (0..self.max_inflight_frames) |_| {
             const semaphore_create_info = &c.VkSemaphoreCreateInfo{
@@ -198,11 +196,11 @@ pub const Swapchain = struct {
 
             var image_available_semaphore: c.VkSemaphore = null;
             try utility.checkResult(c.vkCreateSemaphore.?(self.device.handle, semaphore_create_info, memory.allocation_callbacks, &image_available_semaphore));
-            try self.image_available_semaphores.append(self.allocator, image_available_semaphore);
+            try self.image_available_semaphores.append(memory.default_allocator, image_available_semaphore);
 
             var frame_finished_semaphore: c.VkSemaphore = null;
             try utility.checkResult(c.vkCreateSemaphore.?(self.device.handle, semaphore_create_info, memory.allocation_callbacks, &frame_finished_semaphore));
-            try self.frame_finished_semaphores.append(self.allocator, frame_finished_semaphore);
+            try self.frame_finished_semaphores.append(memory.default_allocator, frame_finished_semaphore);
 
             const fence_create_info = &c.VkFenceCreateInfo{
                 .sType = c.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -212,7 +210,7 @@ pub const Swapchain = struct {
 
             var frame_inflight_fence: c.VkFence = null;
             try utility.checkResult(c.vkCreateFence.?(self.device.handle, fence_create_info, memory.allocation_callbacks, &frame_inflight_fence));
-            try self.frame_inflight_fences.append(self.allocator, frame_inflight_fence);
+            try self.frame_inflight_fences.append(memory.default_allocator, frame_inflight_fence);
         }
     }
 
@@ -229,9 +227,9 @@ pub const Swapchain = struct {
             c.vkDestroyFence.?(self.device.handle, fence, memory.allocation_callbacks);
         }
 
-        self.image_available_semaphores.deinit(self.allocator);
-        self.frame_finished_semaphores.deinit(self.allocator);
-        self.frame_inflight_fences.deinit(self.allocator);
+        self.image_available_semaphores.deinit(memory.default_allocator);
+        self.frame_finished_semaphores.deinit(memory.default_allocator);
+        self.frame_inflight_fences.deinit(memory.default_allocator);
     }
 
     pub fn recreate(self: *Swapchain) !void {

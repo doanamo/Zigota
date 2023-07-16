@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const root = @import("root");
 const c = @import("../c.zig");
+const memory = @import("../memory.zig");
 const utility = @import("utility.zig");
 const log = utility.log_scoped;
 
@@ -13,7 +14,6 @@ pub const Window = struct {
     };
 
     handle: ?*c.GLFWwindow = null,
-    allocator: std.mem.Allocator = undefined,
     width: u32 = undefined,
     height: u32 = undefined,
     resized: bool = false,
@@ -22,12 +22,11 @@ pub const Window = struct {
     title_initial: [:0]const u8 = undefined,
     title_buffer: []u8 = &[_]u8{},
 
-    pub fn init(self: *Window, title: [:0]const u8, allocator: std.mem.Allocator) !void {
+    pub fn init(self: *Window, title: [:0]const u8) !void {
         errdefer self.deinit();
 
-        self.allocator = allocator;
         self.title_initial = title;
-        self.title_buffer = try allocator.alloc(u8, 256);
+        self.title_buffer = try memory.default_allocator.alloc(u8, 256);
 
         self.createWindow() catch {
             log.err("Failed to create window", .{});
@@ -40,7 +39,7 @@ pub const Window = struct {
             c.glfwDestroyWindow(self.handle);
         }
 
-        self.allocator.free(self.title_buffer);
+        memory.default_allocator.free(self.title_buffer);
         self.* = undefined;
     }
 

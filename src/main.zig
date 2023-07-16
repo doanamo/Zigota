@@ -15,7 +15,6 @@ pub const project_version = std.SemanticVersion{
     .patch = 0,
 };
 
-const allocator = memory.default_allocator;
 const log = std.log.scoped(.Main);
 
 pub fn main() !void {
@@ -26,7 +25,7 @@ pub fn main() !void {
     memory.setupMimalloc();
 
     // Load config
-    try config.init(allocator);
+    try config.init();
 
     // Initialize GLFW
     try glfw.init();
@@ -34,7 +33,7 @@ pub fn main() !void {
 
     // Create application
     var application = Application{};
-    try application.init(allocator);
+    try application.init();
     defer application.deinit();
 
     // Main loop
