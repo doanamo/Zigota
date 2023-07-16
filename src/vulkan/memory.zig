@@ -3,16 +3,16 @@ pub usingnamespace @import("../memory.zig");
 const std = @import("std");
 const c = @import("../c.zig");
 
-pub const allocation_callbacks = &c.VkAllocationCallbacks{
+pub const vulkan_allocator = &c.VkAllocationCallbacks{
     .pUserData = null,
-    .pfnAllocation = &vulkanAllocationCallback,
-    .pfnReallocation = &vulkanReallocationCallback,
-    .pfnFree = &vulkanFreeCallback,
+    .pfnAllocation = &vulkanAlloc,
+    .pfnReallocation = &vulkanRealloc,
+    .pfnFree = &vulkanFree,
     .pfnInternalAllocation = null,
     .pfnInternalFree = null,
 };
 
-fn vulkanAllocationCallback(
+fn vulkanAlloc(
     user_data: ?*anyopaque,
     size: usize,
     alignment: usize,
@@ -23,7 +23,7 @@ fn vulkanAllocationCallback(
     return c.mi_malloc_aligned(size, alignment);
 }
 
-fn vulkanReallocationCallback(
+fn vulkanRealloc(
     user_data: ?*anyopaque,
     old_allocation: ?*anyopaque,
     size: usize,
@@ -35,7 +35,7 @@ fn vulkanReallocationCallback(
     return c.mi_realloc_aligned(old_allocation, size, alignment);
 }
 
-fn vulkanFreeCallback(user_data: ?*anyopaque, allocation: ?*anyopaque) callconv(.C) void {
+fn vulkanFree(user_data: ?*anyopaque, allocation: ?*anyopaque) callconv(.C) void {
     _ = user_data;
     c.mi_free(allocation);
 }

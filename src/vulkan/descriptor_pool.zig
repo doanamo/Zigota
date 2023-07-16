@@ -29,7 +29,7 @@ pub const DescriptorPool = struct {
             },
         };
 
-        utility.checkResult(c.vkCreateDescriptorPool.?(self.device.handle, &pool_create_info, memory.allocation_callbacks, &self.handle)) catch {
+        utility.checkResult(c.vkCreateDescriptorPool.?(self.device.handle, &pool_create_info, memory.vulkan_allocator, &self.handle)) catch {
             log.err("Failed to create descriptor pool", .{});
             return error.FailedToCreateDescriptorPool;
         };
@@ -37,7 +37,7 @@ pub const DescriptorPool = struct {
 
     pub fn deinit(self: *DescriptorPool) void {
         if (self.handle != null) {
-            c.vkDestroyDescriptorPool.?(self.device.handle, self.handle, memory.allocation_callbacks);
+            c.vkDestroyDescriptorPool.?(self.device.handle, self.handle, memory.vulkan_allocator);
         }
         self.* = undefined;
     }

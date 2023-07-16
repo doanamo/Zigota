@@ -34,7 +34,7 @@ pub const Surface = struct {
     fn createWindowSurface(self: *Surface, window: *Window, instance: *Instance) !void {
         log.info("Creating window surface...", .{});
 
-        try utility.checkResult(c.glfwCreateWindowSurface(instance.handle, window.handle, memory.allocation_callbacks, &self.handle));
+        try utility.checkResult(c.glfwCreateWindowSurface(instance.handle, window.handle, memory.vulkan_allocator, &self.handle));
         try self.updateCapabilities();
 
         var present_mode_count: u32 = 0;
@@ -49,7 +49,7 @@ pub const Surface = struct {
             memory.default_allocator.free(self.present_modes);
         }
         if (self.handle != null) {
-            c.vkDestroySurfaceKHR.?(self.instance.handle, self.handle, memory.allocation_callbacks);
+            c.vkDestroySurfaceKHR.?(self.instance.handle, self.handle, memory.vulkan_allocator);
         }
     }
 

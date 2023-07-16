@@ -208,7 +208,7 @@ pub const PipelineBuilder = struct {
         };
 
         var pipeline: c.VkPipeline = undefined;
-        try utility.checkResult(c.vkCreateGraphicsPipelines.?(self.device.handle, null, 1, &pipeline_create_info, memory.allocation_callbacks, &pipeline));
+        try utility.checkResult(c.vkCreateGraphicsPipelines.?(self.device.handle, null, 1, &pipeline_create_info, memory.vulkan_allocator, &pipeline));
 
         return .{
             .handle = pipeline,
@@ -223,7 +223,7 @@ pub const Pipeline = struct {
 
     pub fn deinit(self: *Pipeline) void {
         if (self.handle != null) {
-            c.vkDestroyPipeline.?(self.device, self.handle, memory.allocation_callbacks);
+            c.vkDestroyPipeline.?(self.device, self.handle, memory.vulkan_allocator);
         }
     }
 };

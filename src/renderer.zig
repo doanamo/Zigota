@@ -196,7 +196,7 @@ pub const Renderer = struct {
             .pBindings = &descriptor_set_layout_binding,
         };
 
-        try utility.checkResult(c.vkCreateDescriptorSetLayout.?(self.vulkan.device.handle, &descriptor_set_layout_create_info, memory.allocation_callbacks, &self.layout_descriptor_set));
+        try utility.checkResult(c.vkCreateDescriptorSetLayout.?(self.vulkan.device.handle, &descriptor_set_layout_create_info, memory.vulkan_allocator, &self.layout_descriptor_set));
 
         const pipeline_layout_create_info = c.VkPipelineLayoutCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -208,16 +208,16 @@ pub const Renderer = struct {
             .pPushConstantRanges = null,
         };
 
-        try utility.checkResult(c.vkCreatePipelineLayout.?(self.vulkan.device.handle, &pipeline_layout_create_info, memory.allocation_callbacks, &self.layout_pipeline));
+        try utility.checkResult(c.vkCreatePipelineLayout.?(self.vulkan.device.handle, &pipeline_layout_create_info, memory.vulkan_allocator, &self.layout_pipeline));
     }
 
     fn destroyLayouts(self: *Renderer) void {
         if (self.layout_descriptor_set != null) {
-            c.vkDestroyDescriptorSetLayout.?(self.vulkan.device.handle, self.layout_descriptor_set, memory.allocation_callbacks);
+            c.vkDestroyDescriptorSetLayout.?(self.vulkan.device.handle, self.layout_descriptor_set, memory.vulkan_allocator);
         }
 
         if (self.layout_pipeline != null) {
-            c.vkDestroyPipelineLayout.?(self.vulkan.device.handle, self.layout_pipeline, memory.allocation_callbacks);
+            c.vkDestroyPipelineLayout.?(self.vulkan.device.handle, self.layout_pipeline, memory.vulkan_allocator);
         }
     }
 

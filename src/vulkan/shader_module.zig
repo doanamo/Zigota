@@ -61,12 +61,12 @@ pub const ShaderModule = struct {
             .pCode = std.mem.bytesAsSlice(u32, bytes).ptr,
         };
 
-        try utility.checkResult(c.vkCreateShaderModule.?(self.device.handle, create_info, memory.allocation_callbacks, &self.handle));
+        try utility.checkResult(c.vkCreateShaderModule.?(self.device.handle, create_info, memory.vulkan_allocator, &self.handle));
     }
 
     fn destroyShaderModule(self: *ShaderModule) void {
         if (self.handle != null) {
-            c.vkDestroyShaderModule.?(self.device.handle, self.handle, memory.allocation_callbacks);
+            c.vkDestroyShaderModule.?(self.device.handle, self.handle, memory.vulkan_allocator);
         }
     }
 };

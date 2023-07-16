@@ -68,7 +68,7 @@ pub const Instance = struct {
             .ppEnabledExtensionNames = extensions.ptr,
         };
 
-        try utility.checkResult(c.vkCreateInstance.?(&create_info, memory.allocation_callbacks, &self.handle));
+        try utility.checkResult(c.vkCreateInstance.?(&create_info, memory.vulkan_allocator, &self.handle));
         c.volkLoadInstanceOnly(self.handle);
 
         var instance_version: u32 = 0;
@@ -82,7 +82,7 @@ pub const Instance = struct {
 
     fn destroyInstance(self: *Instance) void {
         if (self.handle != null) {
-            c.vkDestroyInstance.?(self.handle, memory.allocation_callbacks);
+            c.vkDestroyInstance.?(self.handle, memory.vulkan_allocator);
         }
     }
 
@@ -100,7 +100,7 @@ pub const Instance = struct {
             .pUserData = null,
         };
 
-        try utility.checkResult(c.vkCreateDebugReportCallbackEXT.?(self.handle, &create_info, memory.allocation_callbacks, &self.debug_callback));
+        try utility.checkResult(c.vkCreateDebugReportCallbackEXT.?(self.handle, &create_info, memory.vulkan_allocator, &self.debug_callback));
     }
 
     fn destroyDebugCallback(self: *Instance) void {
@@ -108,7 +108,7 @@ pub const Instance = struct {
             return;
 
         if (self.debug_callback != null) {
-            c.vkDestroyDebugReportCallbackEXT.?(self.handle, self.debug_callback, memory.allocation_callbacks);
+            c.vkDestroyDebugReportCallbackEXT.?(self.handle, self.debug_callback, memory.vulkan_allocator);
         }
     }
 

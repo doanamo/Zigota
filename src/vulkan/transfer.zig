@@ -122,12 +122,12 @@ pub const Transfer = struct {
             .flags = 0,
         };
 
-        try utility.checkResult(c.vkCreateSemaphore.?(self.device.handle, &semaphore_create_info, memory.allocation_callbacks, &self.finished_semaphore));
+        try utility.checkResult(c.vkCreateSemaphore.?(self.device.handle, &semaphore_create_info, memory.vulkan_allocator, &self.finished_semaphore));
     }
 
     fn destroySynchronization(self: *Transfer) void {
         if (self.finished_semaphore != null) {
-            c.vkDestroySemaphore.?(self.device.handle, self.finished_semaphore, memory.allocation_callbacks);
+            c.vkDestroySemaphore.?(self.device.handle, self.finished_semaphore, memory.vulkan_allocator);
         }
     }
 
