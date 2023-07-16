@@ -2,7 +2,7 @@ const std = @import("std");
 const c = @import("../c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
-const log = utility.log_scoped;
+const log = std.log.scoped(.Vulkan);
 
 const Window = @import("../glfw/window.zig").Window;
 const Instance = @import("instance.zig").Instance;

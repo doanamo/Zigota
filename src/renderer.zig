@@ -20,6 +20,7 @@ const VertexTransformUniform = @import("renderer/uniform_types.zig").VertexTrans
 
 pub const Renderer = struct {
     vulkan: Vulkan = .{},
+
     command_pools: std.ArrayListUnmanaged(CommandPool) = .{},
     command_buffers: std.ArrayListUnmanaged(CommandBuffer) = .{},
     uniform_buffers: std.ArrayListUnmanaged(Buffer) = .{},

@@ -3,8 +3,8 @@ const builtin = @import("builtin");
 const root = @import("root");
 const c = @import("../c.zig");
 const memory = @import("../memory.zig");
-const utility = @import("utility.zig");
-const log = utility.log_scoped;
+const utility = @import("../utility.zig");
+const log = std.log.scoped(.GLFW);
 
 pub const Window = struct {
     pub const Config = struct {

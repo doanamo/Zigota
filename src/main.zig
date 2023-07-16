@@ -3,6 +3,7 @@ const builtin = @import("builtin");
 const c = @import("c.zig");
 const memory = @import("memory.zig");
 const glfw = @import("glfw.zig");
+const log = std.log.scoped(.Main);
 
 const Config = @import("config.zig").Config;
 const Application = @import("application.zig").Application;
@@ -14,8 +15,6 @@ pub const project_version = std.SemanticVersion{
     .minor = 1,
     .patch = 0,
 };
-
-const log = std.log.scoped(.Main);
 
 pub fn main() !void {
     log.info("Starting {s} {}...", .{ project_name, project_version });

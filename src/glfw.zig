@@ -1,7 +1,6 @@
 const std = @import("std");
 const c = @import("c.zig");
-const utility = @import("glfw/utility.zig");
-const log = utility.log_scoped;
+const log = std.log.scoped(.GLFW);
 
 pub fn init() !void {
     log.info("Initializing...", .{});

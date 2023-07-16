@@ -2,6 +2,7 @@ const std = @import("std");
 const c = @import("../c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
+const log = std.log.scoped(.Vulkan);
 
 const Device = @import("device.zig").Device;
 const ShaderStage = @import("shader_module.zig").ShaderStage;
@@ -69,6 +70,8 @@ pub const PipelineBuilder = struct {
     }
 
     pub fn build(self: *PipelineBuilder) !Pipeline {
+        log.info("Creating pipeline...", .{});
+
         var shader_stage_create_infos = try memory.default_allocator.alloc(c.VkPipelineShaderStageCreateInfo, self.shader_stages.items.len);
         defer memory.default_allocator.free(shader_stage_create_infos);
 

@@ -1,9 +1,9 @@
 const std = @import("std");
 const root = @import("root");
 const c = @import("../c.zig");
-const utility = @import("utility.zig");
 const memory = @import("memory.zig");
-const log = utility.log_scoped;
+const utility = @import("utility.zig");
+const log = std.log.scoped(.Vulkan);
 
 const Window = @import("../glfw/window.zig").Window;
 const Surface = @import("surface.zig").Surface;

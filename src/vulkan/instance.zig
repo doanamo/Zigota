@@ -4,7 +4,7 @@ const builtins = @import("builtins");
 const c = @import("../c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
-const log = utility.log_scoped;
+const log = std.log.scoped(.Vulkan);
 
 pub const Instance = struct {
     pub const api_version = c.VK_API_VERSION_1_3;
