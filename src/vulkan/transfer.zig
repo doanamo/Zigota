@@ -94,8 +94,8 @@ pub const Transfer = struct {
         const config = root.config.vulkan.transfer;
         self.staging_size = utility.fromKilobytes(config.staging_size_kb);
 
-        try self.staging_buffer.init(self.vma, &.{
-            .size_bytes = self.staging_size,
+        try self.staging_buffer.init(self.vma, .{
+            .size = self.staging_size,
             .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             .memory_flags = c.VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | c.VMA_ALLOCATION_CREATE_MAPPED_BIT,
         });
@@ -264,7 +264,12 @@ pub const Transfer = struct {
         };
 
         self.finished_semaphore_index += 1;
-        try self.device.submit(.Transfer, 1, &submit_info, null);
+        try self.device.submit(.{
+            .queue_type = .Transfer,
+            .submit_count = 1,
+            .submit_info = &submit_info,
+            .fence = null,
+        });
     }
 
     pub fn wait(self: *Transfer) !void {

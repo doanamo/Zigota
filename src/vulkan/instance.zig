@@ -43,7 +43,7 @@ pub const Instance = struct {
             root.project_version.patch,
         );
 
-        const application_info = &c.VkApplicationInfo{
+        const application_info = c.VkApplicationInfo{
             .sType = c.VK_STRUCTURE_TYPE_APPLICATION_INFO,
             .pNext = null,
             .pApplicationName = root.project_name,
@@ -57,18 +57,18 @@ pub const Instance = struct {
         const extensions = try getExtensions(allocator);
         defer allocator.free(extensions);
 
-        const create_info = &c.VkInstanceCreateInfo{
+        const create_info = c.VkInstanceCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
             .pNext = null,
             .flags = 0,
-            .pApplicationInfo = application_info,
+            .pApplicationInfo = &application_info,
             .enabledLayerCount = if (std.debug.runtime_safety) @intCast(validation_layers.len) else 0,
             .ppEnabledLayerNames = if (std.debug.runtime_safety) &validation_layers else null,
             .enabledExtensionCount = @intCast(extensions.len),
             .ppEnabledExtensionNames = extensions.ptr,
         };
 
-        try utility.checkResult(c.vkCreateInstance.?(create_info, memory.allocation_callbacks, &self.handle));
+        try utility.checkResult(c.vkCreateInstance.?(&create_info, memory.allocation_callbacks, &self.handle));
         c.volkLoadInstanceOnly(self.handle);
 
         var instance_version: u32 = 0;
@@ -92,7 +92,7 @@ pub const Instance = struct {
 
         log.info("Creating debug callback...", .{});
 
-        const create_info = &c.VkDebugReportCallbackCreateInfoEXT{
+        const create_info = c.VkDebugReportCallbackCreateInfoEXT{
             .sType = c.VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,
             .pNext = null,
             .flags = c.VK_DEBUG_REPORT_WARNING_BIT_EXT | c.VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT | c.VK_DEBUG_REPORT_ERROR_BIT_EXT,
@@ -100,7 +100,7 @@ pub const Instance = struct {
             .pUserData = null,
         };
 
-        try utility.checkResult(c.vkCreateDebugReportCallbackEXT.?(self.handle, create_info, memory.allocation_callbacks, &self.debug_callback));
+        try utility.checkResult(c.vkCreateDebugReportCallbackEXT.?(self.handle, &create_info, memory.allocation_callbacks, &self.debug_callback));
     }
 
     fn destroyDebugCallback(self: *Instance) void {

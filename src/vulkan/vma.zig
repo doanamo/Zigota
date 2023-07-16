@@ -15,7 +15,7 @@ pub const VmaAllocator = struct {
         log.info("Creating allocator...", .{});
         errdefer self.deinit();
 
-        const vulkan_functions = &c.VmaVulkanFunctions{
+        const vulkan_functions = c.VmaVulkanFunctions{
             .vkGetInstanceProcAddr = c.vkGetInstanceProcAddr,
             .vkGetDeviceProcAddr = c.vkGetDeviceProcAddr,
             .vkGetPhysicalDeviceProperties = c.vkGetPhysicalDeviceProperties,
@@ -44,7 +44,7 @@ pub const VmaAllocator = struct {
             .vkGetDeviceImageMemoryRequirements = c.vkGetDeviceImageMemoryRequirements,
         };
 
-        const allocator_create_info = &c.VmaAllocatorCreateInfo{
+        const allocator_create_info = c.VmaAllocatorCreateInfo{
             .flags = 0,
             .physicalDevice = physical_device.handle,
             .device = device.handle,
@@ -52,13 +52,13 @@ pub const VmaAllocator = struct {
             .pAllocationCallbacks = memory.allocation_callbacks,
             .pDeviceMemoryCallbacks = null,
             .pHeapSizeLimit = null,
-            .pVulkanFunctions = vulkan_functions,
+            .pVulkanFunctions = &vulkan_functions,
             .instance = instance.handle,
             .vulkanApiVersion = Instance.api_version,
             .pTypeExternalMemoryHandleTypes = null,
         };
 
-        try utility.checkResult(c.vmaCreateAllocator(allocator_create_info, &self.handle));
+        try utility.checkResult(c.vmaCreateAllocator(&allocator_create_info, &self.handle));
     }
 
     pub fn deinit(self: *VmaAllocator) void {

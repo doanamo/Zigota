@@ -41,7 +41,6 @@ pub const Application = struct {
 
         self.renderer.deinit();
         self.window.deinit();
-
         self.* = undefined;
     }
 

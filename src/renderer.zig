@@ -93,11 +93,12 @@ pub const Renderer = struct {
 
         try self.command_pools.ensureTotalCapacityPrecise(self.allocator, self.vulkan.swapchain.max_inflight_frames);
         for (0..self.vulkan.swapchain.max_inflight_frames) |_| {
-            var command_pool = self.command_pools.addOneAssumeCapacity();
+            var command_pool = CommandPool{};
             try command_pool.init(&self.vulkan.device, .{
                 .queue = .Graphics,
                 .flags = c.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
             });
+            self.command_pools.appendAssumeCapacity(command_pool);
         }
 
         try self.command_buffers.ensureTotalCapacityPrecise(self.allocator, self.vulkan.swapchain.max_inflight_frames);
@@ -125,12 +126,13 @@ pub const Renderer = struct {
 
         try self.uniform_buffers.ensureTotalCapacityPrecise(self.allocator, self.vulkan.swapchain.max_inflight_frames);
         for (0..self.vulkan.swapchain.max_inflight_frames) |_| {
-            var uniform_buffer = self.uniform_buffers.addOneAssumeCapacity();
-            try uniform_buffer.init(&self.vulkan.vma, &.{
-                .size_bytes = @sizeOf(VertexTransformUniform),
+            var uniform_buffer = Buffer{};
+            try uniform_buffer.init(&self.vulkan.vma, .{
+                .size = @sizeOf(VertexTransformUniform),
                 .usage_flags = c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 .memory_flags = c.VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | c.VMA_ALLOCATION_CREATE_MAPPED_BIT,
             });
+            self.uniform_buffers.appendAssumeCapacity(uniform_buffer);
         }
 
         const vertices = [_]ColorVertex{
@@ -154,13 +156,13 @@ pub const Renderer = struct {
 
         const indices = [_]u16{ 0, 1, 2, 2, 3, 0 };
 
-        try self.vertex_buffer.init(&self.vulkan.vma, &.{
-            .size_bytes = @sizeOf(ColorVertex) * vertices.len,
+        try self.vertex_buffer.init(&self.vulkan.vma, .{
+            .size = @sizeOf(ColorVertex) * vertices.len,
             .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT | c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
         });
 
-        try self.index_buffer.init(&self.vulkan.vma, &.{
-            .size_bytes = @sizeOf(u16) * indices.len,
+        try self.index_buffer.init(&self.vulkan.vma, .{
+            .size = @sizeOf(u16) * indices.len,
             .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT | c.VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
         });
 
@@ -390,8 +392,7 @@ pub const Renderer = struct {
 
         c.vkCmdBindVertexBuffers.?(command_buffer.handle, 0, 1, vertex_buffers, vertex_offsets);
         c.vkCmdBindIndexBuffer.?(command_buffer.handle, self.index_buffer.handle, 0, c.VK_INDEX_TYPE_UINT16);
-        c.vkCmdDrawIndexed.?(command_buffer.handle, @intCast(self.index_buffer.size_bytes / @sizeOf(u16)), 1, 0, 0, 0);
-
+        c.vkCmdDrawIndexed.?(command_buffer.handle, @intCast(self.index_buffer.size / @sizeOf(u16)), 1, 0, 0, 0);
         c.vkCmdEndRendering.?(command_buffer.handle);
 
         try utility.checkResult(c.vkEndCommandBuffer.?(command_buffer.handle));
@@ -467,9 +468,14 @@ pub const Renderer = struct {
             .pSignalSemaphores = &submit_signal_semaphores,
         };
 
-        try self.vulkan.device.submit(.Graphics, 1, &submit_info, image_next.inflight_fence);
+        try self.vulkan.device.submit(.{
+            .queue_type = .Graphics,
+            .submit_count = 1,
+            .submit_info = &submit_info,
+            .fence = image_next.inflight_fence,
+        });
 
-        const present_info = &c.VkPresentInfoKHR{
+        const present_info = c.VkPresentInfoKHR{
             .sType = c.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
             .pNext = null,
             .waitSemaphoreCount = submit_signal_semaphores.len,
@@ -480,7 +486,7 @@ pub const Renderer = struct {
             .pResults = null,
         };
 
-        self.vulkan.swapchain.present(present_info) catch |err| {
+        self.vulkan.swapchain.present(&present_info) catch |err| {
             if (err == error.SwapchainOutOfDate or err == error.SwapchainSuboptimal) {
                 try self.recreateSwapchain();
                 return;

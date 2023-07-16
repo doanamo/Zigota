@@ -12,7 +12,7 @@ pub const CommandBuffer = struct {
     pub fn init(self: *CommandBuffer, device: *Device, command_pool: *CommandPool, level: c.VkCommandBufferLevel) !void {
         errdefer self.deinit(device, command_pool);
 
-        const allocate_info = &c.VkCommandBufferAllocateInfo{
+        const allocate_info = c.VkCommandBufferAllocateInfo{
             .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
             .pNext = null,
             .commandPool = command_pool.handle,
@@ -20,7 +20,7 @@ pub const CommandBuffer = struct {
             .commandBufferCount = 1,
         };
 
-        utility.checkResult(c.vkAllocateCommandBuffers.?(device.handle, allocate_info, &self.handle)) catch {
+        utility.checkResult(c.vkAllocateCommandBuffers.?(device.handle, &allocate_info, &self.handle)) catch {
             log.err("Failed to create command buffer", .{});
             return error.FailedToCreateCommandBuffer;
         };

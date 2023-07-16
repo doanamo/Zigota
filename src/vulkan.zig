@@ -45,7 +45,6 @@ pub const Vulkan = struct {
 
     pub fn deinit(self: *Vulkan) void {
         log.info("Deinitializing...", .{});
-
         self.device.waitIdle();
 
         self.transfer.deinit();

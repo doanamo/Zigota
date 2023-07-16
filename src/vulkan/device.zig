@@ -210,8 +210,18 @@ pub const Device = struct {
         utility.checkResult(c.vkDeviceWaitIdle.?(self.handle)) catch unreachable;
     }
 
-    pub fn submit(self: *Device, queue_type: QueueType, submit_count: u32, submit_info: *const c.VkSubmitInfo, fence: c.VkFence) !void {
-        try utility.checkResult(c.vkQueueSubmit.?(self.getQueue(queue_type).handle, submit_count, submit_info, fence));
+    pub fn submit(self: *Device, params: struct {
+        queue_type: QueueType,
+        submit_count: u32,
+        submit_info: *const c.VkSubmitInfo,
+        fence: c.VkFence,
+    }) !void {
+        try utility.checkResult(c.vkQueueSubmit.?(
+            self.getQueue(params.queue_type).handle,
+            params.submit_count,
+            params.submit_info,
+            params.fence,
+        ));
     }
 
     pub fn getQueue(self: *Device, queue_type: QueueType) *Queue {
