@@ -39,7 +39,7 @@ pub const Transfer = struct {
     finished_semaphore_index: u64 = 0,
 
     pub fn init(self: *Transfer, device: *Device, vma: *VmaAllocator) !void {
-        log.info("Initializing transfer...", .{});
+        log.info("Initializing transfer queue...", .{});
         self.device = device;
         self.vma = vma;
         errdefer self.deinit();

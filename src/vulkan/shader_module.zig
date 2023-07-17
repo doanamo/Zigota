@@ -52,8 +52,6 @@ pub const ShaderModule = struct {
     }
 
     fn createShaderModule(self: *ShaderModule, bytes: ByteCode) !void {
-        log.info("Creating shader module...", .{});
-
         const create_info = &c.VkShaderModuleCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
             .pNext = null,

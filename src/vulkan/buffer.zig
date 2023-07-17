@@ -19,7 +19,6 @@ pub const Buffer = struct {
         memory_usage: c.VmaMemoryUsage = c.VMA_MEMORY_USAGE_AUTO,
         memory_flags: c.VmaPoolCreateFlags = 0,
     }) !void {
-        log.info("Creating buffer... (size {} bytes)", .{params.size});
         self.size = params.size;
         errdefer self.deinit(vma);
 
@@ -47,6 +46,8 @@ pub const Buffer = struct {
 
         var allocation_info: c.VmaAllocationInfo = undefined;
         try check(c.vmaCreateBuffer(vma.handle, &buffer_create_info, &allocation_create_info, &self.handle, &self.allocation, &allocation_info));
+
+        log.info("Created buffer (size {} bytes)", .{params.size});
     }
 
     pub fn deinit(self: *Buffer, vma: *VmaAllocator) void {

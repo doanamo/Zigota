@@ -13,7 +13,7 @@ pub const VmaAllocator = struct {
     handle: c.VmaAllocator = null,
 
     pub fn init(self: *VmaAllocator, instance: *Instance, physical_device: *PhysicalDevice, device: *Device) !void {
-        log.info("Creating allocator...", .{});
+        log.info("Creating memory allocator...", .{});
         errdefer self.deinit();
 
         const vulkan_functions = c.VmaVulkanFunctions{
