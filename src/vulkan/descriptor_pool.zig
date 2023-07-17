@@ -3,6 +3,7 @@ const c = @import("../c.zig");
 const utility = @import("utility.zig");
 const memory = @import("memory.zig");
 const log = std.log.scoped(.Vulkan);
+const check = utility.vulkanCheckResult;
 
 const Device = @import("device.zig").Device;
 
@@ -29,7 +30,7 @@ pub const DescriptorPool = struct {
             },
         };
 
-        utility.checkResult(c.vkCreateDescriptorPool.?(self.device.handle, &pool_create_info, memory.vulkan_allocator, &self.handle)) catch {
+        check(c.vkCreateDescriptorPool.?(self.device.handle, &pool_create_info, memory.vulkan_allocator, &self.handle)) catch {
             log.err("Failed to create descriptor pool", .{});
             return error.FailedToCreateDescriptorPool;
         };

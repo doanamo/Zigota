@@ -3,6 +3,7 @@ const c = @import("../c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
+const check = utility.vulkanCheckResult;
 
 const Instance = @import("instance.zig").Instance;
 
@@ -30,7 +31,7 @@ pub const PhysicalDevice = struct {
         log.info("Selecting physical device...", .{});
 
         var physical_device_count: u32 = 0;
-        try utility.checkResult(c.vkEnumeratePhysicalDevices.?(instance.handle, &physical_device_count, null));
+        try check(c.vkEnumeratePhysicalDevices.?(instance.handle, &physical_device_count, null));
         if (physical_device_count == 0) {
             log.err("Failed to find any physical devices", .{});
             return error.NoAvailableDevices;
@@ -38,7 +39,7 @@ pub const PhysicalDevice = struct {
 
         const physical_devices = try memory.default_allocator.alloc(c.VkPhysicalDevice, physical_device_count);
         defer memory.default_allocator.free(physical_devices);
-        try utility.checkResult(c.vkEnumeratePhysicalDevices.?(instance.handle, &physical_device_count, physical_devices.ptr));
+        try check(c.vkEnumeratePhysicalDevices.?(instance.handle, &physical_device_count, physical_devices.ptr));
 
         const PhysicalDeviceCandidate = struct {
             device: c.VkPhysicalDevice,

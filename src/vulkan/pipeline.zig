@@ -3,6 +3,7 @@ const c = @import("../c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
+const check = utility.vulkanCheckResult;
 
 const Device = @import("device.zig").Device;
 const ShaderStage = @import("shader_module.zig").ShaderStage;
@@ -211,7 +212,7 @@ pub const PipelineBuilder = struct {
         };
 
         var pipeline: c.VkPipeline = undefined;
-        try utility.checkResult(c.vkCreateGraphicsPipelines.?(self.device.handle, null, 1, &pipeline_create_info, memory.vulkan_allocator, &pipeline));
+        try check(c.vkCreateGraphicsPipelines.?(self.device.handle, null, 1, &pipeline_create_info, memory.vulkan_allocator, &pipeline));
 
         return .{
             .handle = pipeline,

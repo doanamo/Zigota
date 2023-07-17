@@ -3,6 +3,7 @@ const c = @import("../c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
+const check = utility.vulkanCheckResult;
 
 const Instance = @import("instance.zig").Instance;
 const PhysicalDevice = @import("physical_device.zig").PhysicalDevice;
@@ -63,7 +64,7 @@ pub const Device = struct {
                 continue;
 
             var present_support: c.VkBool32 = c.VK_FALSE;
-            try utility.checkResult(c.vkGetPhysicalDeviceSurfaceSupportKHR.?(physical_device.handle, @intCast(i), surface.handle, &present_support));
+            try check(c.vkGetPhysicalDeviceSurfaceSupportKHR.?(physical_device.handle, @intCast(i), surface.handle, &present_support));
             if (present_support == c.VK_FALSE)
                 continue;
 
@@ -192,7 +193,7 @@ pub const Device = struct {
             .pEnabledFeatures = &features,
         };
 
-        try utility.checkResult(c.vkCreateDevice.?(physical_device.handle, &create_info, memory.vulkan_allocator, &self.handle));
+        try check(c.vkCreateDevice.?(physical_device.handle, &create_info, memory.vulkan_allocator, &self.handle));
         c.volkLoadDevice(self.handle);
 
         c.vkGetDeviceQueue.?(self.handle, queue_graphics.index, 0, &queue_graphics.handle);
@@ -207,7 +208,7 @@ pub const Device = struct {
     }
 
     pub fn waitIdle(self: *Device) void {
-        utility.checkResult(c.vkDeviceWaitIdle.?(self.handle)) catch unreachable;
+        check(c.vkDeviceWaitIdle.?(self.handle)) catch unreachable;
     }
 
     pub fn submit(self: *Device, params: struct {
@@ -216,7 +217,7 @@ pub const Device = struct {
         submit_info: *const c.VkSubmitInfo,
         fence: c.VkFence,
     }) !void {
-        try utility.checkResult(c.vkQueueSubmit.?(
+        try check(c.vkQueueSubmit.?(
             self.getQueue(params.queue_type).handle,
             params.submit_count,
             params.submit_info,

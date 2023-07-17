@@ -4,6 +4,7 @@ const c = @import("../c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
+const check = utility.vulkanCheckResult;
 
 const Device = @import("device.zig").Device;
 const VmaAllocator = @import("vma.zig").VmaAllocator;
@@ -122,7 +123,7 @@ pub const Transfer = struct {
             .flags = 0,
         };
 
-        try utility.checkResult(c.vkCreateSemaphore.?(self.device.handle, &semaphore_create_info, memory.vulkan_allocator, &self.finished_semaphore));
+        try check(c.vkCreateSemaphore.?(self.device.handle, &semaphore_create_info, memory.vulkan_allocator, &self.finished_semaphore));
     }
 
     fn destroySynchronization(self: *Transfer) void {
@@ -205,7 +206,7 @@ pub const Transfer = struct {
         try self.staging_buffer.flush(self.vma, 0, c.VK_WHOLE_SIZE);
         try self.command_pool.reset();
 
-        try utility.checkResult(c.vkBeginCommandBuffer.?(self.command_buffer.handle, &c.VkCommandBufferBeginInfo{
+        try check(c.vkBeginCommandBuffer.?(self.command_buffer.handle, &c.VkCommandBufferBeginInfo{
             .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
             .pNext = null,
             .flags = c.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
@@ -238,7 +239,7 @@ pub const Transfer = struct {
             self.buffer_ownership_transfers_source.clearRetainingCapacity();
         }
 
-        try utility.checkResult(c.vkEndCommandBuffer.?(self.command_buffer.handle));
+        try check(c.vkEndCommandBuffer.?(self.command_buffer.handle));
 
         const timeline_semaphore_submit_info = c.VkTimelineSemaphoreSubmitInfo{
             .sType = c.VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
@@ -280,7 +281,7 @@ pub const Transfer = struct {
             .pValues = &self.finished_semaphore_index,
         };
 
-        try utility.checkResult(c.vkWaitSemaphores.?(self.device.handle, &semaphore_wait_info, std.math.maxInt(u64)));
+        try check(c.vkWaitSemaphores.?(self.device.handle, &semaphore_wait_info, std.math.maxInt(u64)));
     }
 
     pub fn recordOwnershipTransfers(self: *Transfer, command_buffer: *CommandBuffer) void {

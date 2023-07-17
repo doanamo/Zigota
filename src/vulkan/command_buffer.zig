@@ -2,6 +2,7 @@ const std = @import("std");
 const c = @import("../c.zig");
 const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
+const check = utility.vulkanCheckResult;
 
 const Device = @import("device.zig").Device;
 const CommandPool = @import("command_pool.zig").CommandPool;
@@ -20,7 +21,7 @@ pub const CommandBuffer = struct {
             .commandBufferCount = 1,
         };
 
-        utility.checkResult(c.vkAllocateCommandBuffers.?(device.handle, &allocate_info, &self.handle)) catch {
+        check(c.vkAllocateCommandBuffers.?(device.handle, &allocate_info, &self.handle)) catch {
             log.err("Failed to create command buffer", .{});
             return error.FailedToCreateCommandBuffer;
         };

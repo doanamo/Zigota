@@ -3,6 +3,7 @@ const c = @import("../c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
+const check = utility.vulkanCheckResult;
 
 const Device = @import("device.zig").Device;
 const CommandBuffer = @import("command_buffer.zig").CommandBuffer;
@@ -25,7 +26,7 @@ pub const CommandPool = struct {
             .queueFamilyIndex = device.getQueue(params.queue).index,
         };
 
-        utility.checkResult(c.vkCreateCommandPool.?(device.handle, &create_info, memory.vulkan_allocator, &self.handle)) catch {
+        check(c.vkCreateCommandPool.?(device.handle, &create_info, memory.vulkan_allocator, &self.handle)) catch {
             log.err("Failed to create command pool", .{});
             return error.FailedToCreateCommandPool;
         };
@@ -45,6 +46,6 @@ pub const CommandPool = struct {
     }
 
     pub fn reset(self: *CommandPool) !void {
-        try utility.checkResult(c.vkResetCommandPool.?(self.device.handle, self.handle, 0));
+        try check(c.vkResetCommandPool.?(self.device.handle, self.handle, 0));
     }
 };

@@ -3,6 +3,7 @@ const c = @import("../c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
+const check = utility.vulkanCheckResult;
 
 const Window = @import("../glfw/window.zig").Window;
 const Instance = @import("instance.zig").Instance;
@@ -34,14 +35,14 @@ pub const Surface = struct {
     fn createWindowSurface(self: *Surface, window: *Window, instance: *Instance) !void {
         log.info("Creating window surface...", .{});
 
-        try utility.checkResult(c.glfwCreateWindowSurface(instance.handle, window.handle, memory.vulkan_allocator, &self.handle));
+        try check(c.glfwCreateWindowSurface(instance.handle, window.handle, memory.vulkan_allocator, &self.handle));
         try self.updateCapabilities();
 
         var present_mode_count: u32 = 0;
-        try utility.checkResult(c.vkGetPhysicalDeviceSurfacePresentModesKHR.?(self.physical_device.handle, self.handle, &present_mode_count, null));
+        try check(c.vkGetPhysicalDeviceSurfacePresentModesKHR.?(self.physical_device.handle, self.handle, &present_mode_count, null));
 
         self.present_modes = try memory.default_allocator.alloc(c.VkPresentModeKHR, present_mode_count);
-        try utility.checkResult(c.vkGetPhysicalDeviceSurfacePresentModesKHR.?(self.physical_device.handle, self.handle, &present_mode_count, self.present_modes.ptr));
+        try check(c.vkGetPhysicalDeviceSurfacePresentModesKHR.?(self.physical_device.handle, self.handle, &present_mode_count, self.present_modes.ptr));
     }
 
     fn destroyWindowSurface(self: *Surface) void {
@@ -56,6 +57,6 @@ pub const Surface = struct {
     pub fn updateCapabilities(self: *Surface) !void {
         // This is exposed because it needs to be called at least once
         // after resizing window to avoid Vulkan validation layer errors
-        try utility.checkResult(c.vkGetPhysicalDeviceSurfaceCapabilitiesKHR.?(self.physical_device.handle, self.handle, &self.capabilities));
+        try check(c.vkGetPhysicalDeviceSurfaceCapabilitiesKHR.?(self.physical_device.handle, self.handle, &self.capabilities));
     }
 };

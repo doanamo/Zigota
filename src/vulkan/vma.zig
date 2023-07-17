@@ -3,6 +3,7 @@ const c = @import("../c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
+const check = utility.vulkanCheckResult;
 
 const Instance = @import("instance.zig").Instance;
 const PhysicalDevice = @import("physical_device.zig").PhysicalDevice;
@@ -58,7 +59,7 @@ pub const VmaAllocator = struct {
             .pTypeExternalMemoryHandleTypes = null,
         };
 
-        try utility.checkResult(c.vmaCreateAllocator(&allocator_create_info, &self.handle));
+        try check(c.vmaCreateAllocator(&allocator_create_info, &self.handle));
     }
 
     pub fn deinit(self: *VmaAllocator) void {

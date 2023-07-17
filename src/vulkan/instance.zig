@@ -5,6 +5,7 @@ const c = @import("../c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
+const check = utility.vulkanCheckResult;
 
 pub const Instance = struct {
     pub const api_version = c.VK_API_VERSION_1_3;
@@ -35,7 +36,7 @@ pub const Instance = struct {
     fn createInstance(self: *Instance) !void {
         log.info("Creating instance...", .{});
 
-        try utility.checkResult(c.volkInitialize());
+        try check(c.volkInitialize());
 
         const project_version = c.VK_MAKE_VERSION(
             root.project_version.major,
@@ -68,11 +69,11 @@ pub const Instance = struct {
             .ppEnabledExtensionNames = extensions.ptr,
         };
 
-        try utility.checkResult(c.vkCreateInstance.?(&create_info, memory.vulkan_allocator, &self.handle));
+        try check(c.vkCreateInstance.?(&create_info, memory.vulkan_allocator, &self.handle));
         c.volkLoadInstanceOnly(self.handle);
 
         var instance_version: u32 = 0;
-        try utility.checkResult(c.vkEnumerateInstanceVersion.?(&instance_version));
+        try check(c.vkEnumerateInstanceVersion.?(&instance_version));
         log.info("Instance version {}.{}.{}", .{
             c.VK_VERSION_MAJOR(instance_version),
             c.VK_VERSION_MINOR(instance_version),
@@ -100,7 +101,7 @@ pub const Instance = struct {
             .pUserData = null,
         };
 
-        try utility.checkResult(c.vkCreateDebugReportCallbackEXT.?(self.handle, &create_info, memory.vulkan_allocator, &self.debug_callback));
+        try check(c.vkCreateDebugReportCallbackEXT.?(self.handle, &create_info, memory.vulkan_allocator, &self.debug_callback));
     }
 
     fn destroyDebugCallback(self: *Instance) void {

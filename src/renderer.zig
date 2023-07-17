@@ -4,6 +4,7 @@ const math = @import("math.zig");
 const memory = @import("vulkan/memory.zig");
 const utility = @import("vulkan/utility.zig");
 const log = std.log.scoped(.Renderer);
+const check = utility.vulkanCheckResult;
 
 const Window = @import("glfw/window.zig").Window;
 const Vulkan = @import("vulkan.zig").Vulkan;
@@ -197,7 +198,7 @@ pub const Renderer = struct {
             .pBindings = &descriptor_set_layout_binding,
         };
 
-        try utility.checkResult(c.vkCreateDescriptorSetLayout.?(self.vulkan.device.handle, &descriptor_set_layout_create_info, memory.vulkan_allocator, &self.layout_descriptor_set));
+        try check(c.vkCreateDescriptorSetLayout.?(self.vulkan.device.handle, &descriptor_set_layout_create_info, memory.vulkan_allocator, &self.layout_descriptor_set));
 
         const pipeline_layout_create_info = c.VkPipelineLayoutCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -209,7 +210,7 @@ pub const Renderer = struct {
             .pPushConstantRanges = null,
         };
 
-        try utility.checkResult(c.vkCreatePipelineLayout.?(self.vulkan.device.handle, &pipeline_layout_create_info, memory.vulkan_allocator, &self.layout_pipeline));
+        try check(c.vkCreatePipelineLayout.?(self.vulkan.device.handle, &pipeline_layout_create_info, memory.vulkan_allocator, &self.layout_pipeline));
     }
 
     fn destroyLayouts(self: *Renderer) void {
@@ -241,7 +242,7 @@ pub const Renderer = struct {
             };
 
             var descriptor_set: c.VkDescriptorSet = undefined;
-            try utility.checkResult(c.vkAllocateDescriptorSets.?(self.vulkan.device.handle, &set_allocate_info, &descriptor_set));
+            try check(c.vkAllocateDescriptorSets.?(self.vulkan.device.handle, &set_allocate_info, &descriptor_set));
             self.descriptor_sets.appendAssumeCapacity(descriptor_set);
 
             const buffer_info = c.VkDescriptorBufferInfo{
@@ -318,7 +319,7 @@ pub const Renderer = struct {
             .pInheritanceInfo = null,
         };
 
-        try utility.checkResult(c.vkBeginCommandBuffer.?(command_buffer.handle, &command_buffer_begin_info));
+        try check(c.vkBeginCommandBuffer.?(command_buffer.handle, &command_buffer_begin_info));
         self.vulkan.transfer.recordOwnershipTransfers(command_buffer);
         self.vulkan.swapchain.recordLayoutTransitions(command_buffer, image_index);
 
@@ -393,7 +394,7 @@ pub const Renderer = struct {
         c.vkCmdDrawIndexed.?(command_buffer.handle, @intCast(self.index_buffer.size / @sizeOf(u16)), 1, 0, 0, 0);
         c.vkCmdEndRendering.?(command_buffer.handle);
 
-        try utility.checkResult(c.vkEndCommandBuffer.?(command_buffer.handle));
+        try check(c.vkEndCommandBuffer.?(command_buffer.handle));
     }
 
     pub fn update(self: *Renderer, time_delta: f32) !void {

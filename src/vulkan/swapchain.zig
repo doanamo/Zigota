@@ -4,6 +4,7 @@ const c = @import("../c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
+const check = utility.vulkanCheckResult;
 
 const Window = @import("../glfw/window.zig").Window;
 const Surface = @import("surface.zig").Surface;
@@ -115,7 +116,7 @@ pub const Swapchain = struct {
             .oldSwapchain = null,
         };
 
-        try utility.checkResult(c.vkCreateSwapchainKHR.?(self.device.handle, &create_info, memory.vulkan_allocator, &self.handle));
+        try check(c.vkCreateSwapchainKHR.?(self.device.handle, &create_info, memory.vulkan_allocator, &self.handle));
     }
 
     fn destroySwapchain(self: *Swapchain) void {
@@ -130,11 +131,11 @@ pub const Swapchain = struct {
         errdefer self.destroyImageViews(recreating);
 
         var image_count: u32 = 0;
-        try utility.checkResult(c.vkGetSwapchainImagesKHR.?(self.device.handle, self.handle, &image_count, null));
+        try check(c.vkGetSwapchainImagesKHR.?(self.device.handle, self.handle, &image_count, null));
         self.max_inflight_frames = image_count;
 
         try self.images.resize(memory.default_allocator, image_count);
-        try utility.checkResult(c.vkGetSwapchainImagesKHR.?(self.device.handle, self.handle, &image_count, self.images.items.ptr));
+        try check(c.vkGetSwapchainImagesKHR.?(self.device.handle, self.handle, &image_count, self.images.items.ptr));
 
         try self.image_views.ensureTotalCapacityPrecise(memory.default_allocator, image_count);
         for (self.images.items) |image| {
@@ -161,7 +162,7 @@ pub const Swapchain = struct {
             };
 
             var image_view: c.VkImageView = null;
-            try utility.checkResult(c.vkCreateImageView.?(self.device.handle, create_info, memory.vulkan_allocator, &image_view));
+            try check(c.vkCreateImageView.?(self.device.handle, create_info, memory.vulkan_allocator, &image_view));
             try self.image_views.append(memory.default_allocator, image_view);
         }
     }
@@ -195,11 +196,11 @@ pub const Swapchain = struct {
             };
 
             var image_available_semaphore: c.VkSemaphore = null;
-            try utility.checkResult(c.vkCreateSemaphore.?(self.device.handle, semaphore_create_info, memory.vulkan_allocator, &image_available_semaphore));
+            try check(c.vkCreateSemaphore.?(self.device.handle, semaphore_create_info, memory.vulkan_allocator, &image_available_semaphore));
             try self.image_available_semaphores.append(memory.default_allocator, image_available_semaphore);
 
             var frame_finished_semaphore: c.VkSemaphore = null;
-            try utility.checkResult(c.vkCreateSemaphore.?(self.device.handle, semaphore_create_info, memory.vulkan_allocator, &frame_finished_semaphore));
+            try check(c.vkCreateSemaphore.?(self.device.handle, semaphore_create_info, memory.vulkan_allocator, &frame_finished_semaphore));
             try self.frame_finished_semaphores.append(memory.default_allocator, frame_finished_semaphore);
 
             const fence_create_info = &c.VkFenceCreateInfo{
@@ -209,7 +210,7 @@ pub const Swapchain = struct {
             };
 
             var frame_inflight_fence: c.VkFence = null;
-            try utility.checkResult(c.vkCreateFence.?(self.device.handle, fence_create_info, memory.vulkan_allocator, &frame_inflight_fence));
+            try check(c.vkCreateFence.?(self.device.handle, fence_create_info, memory.vulkan_allocator, &frame_inflight_fence));
             try self.frame_inflight_fences.append(memory.default_allocator, frame_inflight_fence);
         }
     }
@@ -249,14 +250,14 @@ pub const Swapchain = struct {
         finished_semaphore: c.VkSemaphore,
         inflight_fence: c.VkFence,
     } {
-        try utility.checkResult(c.vkWaitForFences.?(self.device.handle, 1, &self.frame_inflight_fences.items[self.frame_index], c.VK_TRUE, std.math.maxInt(u64)));
+        try check(c.vkWaitForFences.?(self.device.handle, 1, &self.frame_inflight_fences.items[self.frame_index], c.VK_TRUE, std.math.maxInt(u64)));
 
         var image_index: u32 = 0;
         const result = c.vkAcquireNextImageKHR.?(self.device.handle, self.handle, std.math.maxInt(u64), self.image_available_semaphores.items[self.frame_index], null, &image_index);
 
         switch (result) {
             c.VK_SUCCESS, c.VK_SUBOPTIMAL_KHR => {
-                try utility.checkResult(c.vkResetFences.?(self.device.handle, 1, &self.frame_inflight_fences.items[self.frame_index]));
+                try check(c.vkResetFences.?(self.device.handle, 1, &self.frame_inflight_fences.items[self.frame_index]));
 
                 return .{
                     .index = image_index,

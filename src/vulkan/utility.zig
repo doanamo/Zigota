@@ -4,7 +4,7 @@ const std = @import("std");
 const c = @import("../c.zig");
 
 pub var last_result = c.VK_SUCCESS;
-pub fn checkResult(result: c.VkResult) !void {
+pub fn vulkanCheckResult(result: c.VkResult) !void {
     last_result = result;
 
     switch (result) {

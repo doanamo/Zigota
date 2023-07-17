@@ -3,6 +3,7 @@ const c = @import("../c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
+const check = utility.vulkanCheckResult;
 
 const VmaAllocator = @import("vma.zig").VmaAllocator;
 
@@ -45,7 +46,7 @@ pub const Buffer = struct {
         };
 
         var allocation_info: c.VmaAllocationInfo = undefined;
-        try utility.checkResult(c.vmaCreateBuffer(vma.handle, &buffer_create_info, &allocation_create_info, &self.handle, &self.allocation, &allocation_info));
+        try check(c.vmaCreateBuffer(vma.handle, &buffer_create_info, &allocation_create_info, &self.handle, &self.allocation, &allocation_info));
     }
 
     pub fn deinit(self: *Buffer, vma: *VmaAllocator) void {
@@ -57,7 +58,7 @@ pub const Buffer = struct {
 
     pub fn map(self: *Buffer, vma: *VmaAllocator) ![]u8 {
         var data: ?*anyopaque = undefined;
-        try utility.checkResult(c.vmaMapMemory(vma.handle, self.allocation, &data));
+        try check(c.vmaMapMemory(vma.handle, self.allocation, &data));
         return @as([*]u8, @ptrCast(@alignCast(data)))[0..self.size];
     }
 
@@ -73,6 +74,6 @@ pub const Buffer = struct {
     }
 
     pub fn flush(self: *Buffer, vma: *VmaAllocator, offset: usize, size: usize) !void {
-        try utility.checkResult(c.vmaFlushAllocation(vma.handle, self.allocation, offset, size));
+        try check(c.vmaFlushAllocation(vma.handle, self.allocation, offset, size));
     }
 };
