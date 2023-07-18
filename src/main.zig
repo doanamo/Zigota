@@ -20,8 +20,9 @@ pub fn main() !void {
     log.info("Starting {s} {}...", .{ project_name, project_version });
     log.debug("Debug logging enabled", .{});
 
-    // Setup memory
-    memory.setupMimalloc();
+    // Core memory
+    try memory.init();
+    defer memory.deinit();
 
     // Load config
     try config.init();
@@ -47,6 +48,8 @@ pub fn main() !void {
 
         try application.update(time_delta);
         try application.render();
+
+        memory.frame_arena_allocator.reset(.retain_capacity);
     }
 
     log.info("Exiting application...", .{});

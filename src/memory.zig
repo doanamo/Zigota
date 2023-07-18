@@ -1,14 +1,27 @@
 const c = @import("c.zig");
 const std = @import("std");
 
-pub const default_allocator = MimallocAllocator;
+pub const frame_arena_allocator: std.heap.ArenaAllocator = undefined;
+pub const frame_allocator: std.mem.Allocator = undefined;
+pub const default_allocator: std.mem.Allocator = undefined;
 
-pub fn setupMimalloc() void {
+pub fn init() !void {
     if (std.debug.runtime_safety) {
         c.mi_option_enable(c.mi_option_show_errors);
         c.mi_option_enable(c.mi_option_show_stats);
         c.mi_option_enable(c.mi_option_verbose);
     }
+
+    frame_arena_allocator = std.heap.ArenaAllocator.init(MimallocAllocator);
+    frame_allocator = frame_arena_allocator.allocator();
+    default_allocator = MimallocAllocator;
+}
+
+pub fn deinit() void {
+    frame_arena_allocator.deinit();
+    frame_arena_allocator = undefined;
+    frame_allocator = undefined;
+    default_allocator = undefined;
 }
 
 pub const MimallocAllocator = std.mem.Allocator{
