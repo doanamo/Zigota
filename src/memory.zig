@@ -1,9 +1,9 @@
 const c = @import("c.zig");
 const std = @import("std");
 
-pub const frame_arena_allocator: std.heap.ArenaAllocator = undefined;
-pub const frame_allocator: std.mem.Allocator = undefined;
-pub const default_allocator: std.mem.Allocator = undefined;
+pub var frame_arena_allocator: std.heap.ArenaAllocator = undefined;
+pub var frame_allocator: std.mem.Allocator = undefined;
+pub var default_allocator: std.mem.Allocator = undefined;
 
 pub fn init() !void {
     if (std.debug.runtime_safety) {
