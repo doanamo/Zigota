@@ -104,7 +104,7 @@ pub const Transfer = struct {
         self.buffer_copy_commands.deinit(memory.default_allocator);
         self.buffer_ownership_transfers_source.deinit(memory.default_allocator);
         self.buffer_ownership_transfers_target.deinit(memory.default_allocator);
-        self.staging_buffer.deinit(self.vma);
+        self.staging_buffer.deinit();
     }
 
     fn createSynchronization(self: *Transfer) !void {

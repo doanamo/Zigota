@@ -171,12 +171,12 @@ pub const Renderer = struct {
 
     fn destroyBuffers(self: *Renderer) void {
         for (self.uniform_buffers.items) |*uniform_buffer| {
-            uniform_buffer.deinit(&self.vulkan.vma);
+            uniform_buffer.deinit();
         }
         self.uniform_buffers.deinit(memory.default_allocator);
 
-        self.vertex_buffer.deinit(&self.vulkan.vma);
-        self.index_buffer.deinit(&self.vulkan.vma);
+        self.vertex_buffer.deinit();
+        self.index_buffer.deinit();
     }
 
     fn createLayouts(self: *Renderer) !void {

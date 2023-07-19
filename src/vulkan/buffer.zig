@@ -8,8 +8,9 @@ const check = utility.vulkanCheckResult;
 const VmaAllocator = @import("vma.zig").VmaAllocator;
 
 pub const Buffer = struct {
+    vma: VmaAllocator = undefined,
     handle: c.VkBuffer = null,
-    allocation: c.VmaAllocation = null,
+    allocation: c.VmaAllocation = undefined,
     size: usize = 0,
 
     pub fn init(self: *Buffer, vma: *VmaAllocator, params: struct {
@@ -19,8 +20,9 @@ pub const Buffer = struct {
         memory_usage: c.VmaMemoryUsage = c.VMA_MEMORY_USAGE_AUTO,
         memory_flags: c.VmaPoolCreateFlags = 0,
     }) !void {
+        self.vma = vma;
         self.size = params.size;
-        errdefer self.deinit(vma);
+        errdefer self.deinit();
 
         const buffer_create_info = c.VkBufferCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -50,31 +52,31 @@ pub const Buffer = struct {
         log.info("Created buffer (size {} bytes)", .{params.size});
     }
 
-    pub fn deinit(self: *Buffer, vma: *VmaAllocator) void {
+    pub fn deinit(self: *Buffer) void {
         if (self.handle != null) {
-            c.vmaDestroyBuffer(vma.handle, self.handle, self.allocation);
+            c.vmaDestroyBuffer(self.vma.handle, self.handle, self.allocation);
         }
         self.* = undefined;
     }
 
-    pub fn map(self: *Buffer, vma: *VmaAllocator) ![]u8 {
+    pub fn map(self: *Buffer) ![]u8 {
         var data: ?*anyopaque = undefined;
-        try check(c.vmaMapMemory(vma.handle, self.allocation, &data));
+        try check(c.vmaMapMemory(self.vma.handle, self.allocation, &data));
         return @as([*]u8, @ptrCast(@alignCast(data)))[0..self.size];
     }
 
-    pub fn unmap(self: *Buffer, vma: *VmaAllocator) void {
-        c.vmaUnmapMemory(vma.handle, self.allocation);
+    pub fn unmap(self: *Buffer) void {
+        c.vmaUnmapMemory(self.vma.handle, self.allocation);
     }
 
-    pub fn upload(self: *Buffer, vma: *VmaAllocator, data: []const u8, offset: usize) !void {
-        const mapped_data = try self.map(vma);
-        defer self.unmap(vma);
+    pub fn upload(self: *Buffer, data: []const u8, offset: usize) !void {
+        const mapped_data = try self.map();
+        defer self.unmap();
 
         @memcpy(mapped_data[offset .. offset + data.len], data);
     }
 
-    pub fn flush(self: *Buffer, vma: *VmaAllocator, offset: usize, size: usize) !void {
-        try check(c.vmaFlushAllocation(vma.handle, self.allocation, offset, size));
+    pub fn flush(self: *Buffer, offset: usize, size: usize) !void {
+        try check(c.vmaFlushAllocation(self.vma.handle, self.allocation, offset, size));
     }
 };
