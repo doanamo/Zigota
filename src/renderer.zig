@@ -16,7 +16,6 @@ const ShaderModule = @import("vulkan/shader_module.zig").ShaderModule;
 const PipelineBuilder = @import("vulkan/pipeline.zig").PipelineBuilder;
 const Pipeline = @import("vulkan/pipeline.zig").Pipeline;
 
-const ColorVertex = @import("renderer/vertex_types.zig").ColorVertex;
 const VertexTransformUniform = @import("renderer/uniform_types.zig").VertexTransformUniform;
 
 pub const Renderer = struct {
@@ -25,7 +24,9 @@ pub const Renderer = struct {
     command_pools: std.ArrayListUnmanaged(CommandPool) = .{},
     command_buffers: std.ArrayListUnmanaged(CommandBuffer) = .{},
     uniform_buffers: std.ArrayListUnmanaged(Buffer) = .{},
-    vertex_buffer: Buffer = .{},
+    vertex_position_buffer: Buffer = .{},
+    vertex_normal_buffer: Buffer = .{},
+    vertex_color_buffer: Buffer = .{},
     index_buffer: Buffer = .{},
     layout_descriptor_set: c.VkDescriptorSetLayout = null,
     layout_pipeline: c.VkPipelineLayout = null,
@@ -123,6 +124,7 @@ pub const Renderer = struct {
     fn createBuffers(self: *Renderer) !void {
         log.info("Creating buffers...", .{});
 
+        // Uniform buffers
         try self.uniform_buffers.ensureTotalCapacityPrecise(memory.default_allocator, self.vulkan.swapchain.max_inflight_frames);
         for (0..self.vulkan.swapchain.max_inflight_frames) |_| {
             var uniform_buffer = Buffer{};
@@ -134,38 +136,56 @@ pub const Renderer = struct {
             self.uniform_buffers.appendAssumeCapacity(uniform_buffer);
         }
 
-        const vertices = [_]ColorVertex{
-            ColorVertex{
-                .position = [3]f32{ 0.5, -0.5, 0.0 },
-                .color = [4]f32{ 1.0, 0.0, 0.0, 1.0 },
-            },
-            ColorVertex{
-                .position = [3]f32{ 0.5, 0.5, 0.0 },
-                .color = [4]f32{ 0.0, 1.0, 0.0, 1.0 },
-            },
-            ColorVertex{
-                .position = [3]f32{ -0.5, 0.5, 0.0 },
-                .color = [4]f32{ 0.0, 0.0, 1.0, 1.0 },
-            },
-            ColorVertex{
-                .position = [3]f32{ -0.5, -0.5, 0.0 },
-                .color = [4]f32{ 1.0, 1.0, 0.0, 1.0 },
-            },
+        // Vertex position buffer
+        const positions = [_][3]f32{
+            [3]f32{ 0.5, -0.5, 0.0 },
+            [3]f32{ 0.5, 0.5, 0.0 },
+            [3]f32{ -0.5, 0.5, 0.0 },
+            [3]f32{ -0.5, -0.5, 0.0 },
         };
 
-        const indices = [_]u16{ 0, 1, 2, 2, 3, 0 };
-
-        try self.vertex_buffer.init(&self.vulkan.vma, .{
-            .size = @sizeOf(ColorVertex) * vertices.len,
+        try self.vertex_position_buffer.init(&self.vulkan.vma, .{
+            .size = @sizeOf([3]f32) * positions.len,
             .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT | c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
         });
+        try self.vulkan.transfer.upload(&self.vertex_position_buffer, 0, std.mem.sliceAsBytes(&positions));
+
+        // Vertex normal buffer
+        const normals = [_][3]f32{
+            [3]f32{ 0.0, 0.0, 0.0 },
+            [3]f32{ 0.0, 0.0, 0.0 },
+            [3]f32{ 0.0, 0.0, 0.0 },
+            [3]f32{ 0.0, 0.0, 0.0 },
+        };
+
+        try self.vertex_normal_buffer.init(&self.vulkan.vma, .{
+            .size = @sizeOf([3]f32) * normals.len,
+            .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT | c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        });
+        try self.vulkan.transfer.upload(&self.vertex_normal_buffer, 0, std.mem.sliceAsBytes(&normals));
+
+        // Vertex color buffer
+        const colors = [_][4]f32{
+            [4]f32{ 1.0, 0.0, 0.0, 1.0 },
+            [4]f32{ 0.0, 1.0, 0.0, 1.0 },
+            [4]f32{ 0.0, 0.0, 1.0, 1.0 },
+            [4]f32{ 1.0, 1.0, 0.0, 1.0 },
+        };
+
+        try self.vertex_color_buffer.init(&self.vulkan.vma, .{
+            .size = @sizeOf([4]f32) * colors.len,
+            .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT | c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        });
+        try self.vulkan.transfer.upload(&self.vertex_color_buffer, 0, std.mem.sliceAsBytes(&colors));
+
+        // Vertex index buffer
+        const indices = [_]u32{ 0, 1, 2, 2, 3, 0 };
 
         try self.index_buffer.init(&self.vulkan.vma, .{
-            .size = @sizeOf(u16) * indices.len,
+            .size = @sizeOf(u32) * indices.len,
             .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT | c.VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
         });
 
-        try self.vulkan.transfer.upload(&self.vertex_buffer, 0, std.mem.sliceAsBytes(&vertices));
         try self.vulkan.transfer.upload(&self.index_buffer, 0, std.mem.sliceAsBytes(&indices));
     }
 
@@ -175,7 +195,9 @@ pub const Renderer = struct {
         }
         self.uniform_buffers.deinit(memory.default_allocator);
 
-        self.vertex_buffer.deinit();
+        self.vertex_position_buffer.deinit();
+        self.vertex_normal_buffer.deinit();
+        self.vertex_color_buffer.deinit();
         self.index_buffer.deinit();
     }
 
@@ -283,7 +305,10 @@ pub const Renderer = struct {
         try builder.loadShaderModule(.Vertex, "data/shaders/simple.vert.spv");
         try builder.loadShaderModule(.Fragment, "data/shaders/simple.frag.spv");
 
-        builder.setVertexInputType(ColorVertex);
+        try builder.addVertexAttribute(.Float3, false); // Position
+        try builder.addVertexAttribute(.Float3, false); // Normal
+        try builder.addVertexAttribute(.Float4, false); // Color
+
         builder.setColorAttachmentFormat(self.vulkan.swapchain.image_format);
         builder.setPipelineLayout(self.layout_pipeline);
 
@@ -382,16 +407,20 @@ pub const Renderer = struct {
         });
 
         const vertex_buffers = &[_]c.VkBuffer{
-            self.vertex_buffer.handle,
+            self.vertex_position_buffer.handle,
+            self.vertex_normal_buffer.handle,
+            self.vertex_color_buffer.handle,
         };
 
         const vertex_offsets = &[_]c.VkDeviceSize{
             0,
+            0,
+            0,
         };
 
-        c.vkCmdBindVertexBuffers.?(command_buffer.handle, 0, 1, vertex_buffers, vertex_offsets);
-        c.vkCmdBindIndexBuffer.?(command_buffer.handle, self.index_buffer.handle, 0, c.VK_INDEX_TYPE_UINT16);
-        c.vkCmdDrawIndexed.?(command_buffer.handle, @intCast(self.index_buffer.size / @sizeOf(u16)), 1, 0, 0, 0);
+        c.vkCmdBindVertexBuffers.?(command_buffer.handle, 0, vertex_buffers.len, vertex_buffers, vertex_offsets);
+        c.vkCmdBindIndexBuffer.?(command_buffer.handle, self.index_buffer.handle, 0, c.VK_INDEX_TYPE_UINT32);
+        c.vkCmdDrawIndexed.?(command_buffer.handle, @intCast(self.index_buffer.size / @sizeOf(u32)), 1, 0, 0, 0);
         c.vkCmdEndRendering.?(command_buffer.handle);
 
         try check(c.vkEndCommandBuffer.?(command_buffer.handle));

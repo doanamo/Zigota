@@ -2,12 +2,15 @@ const std = @import("std");
 const c = @import("../c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
-const log = std.log.scoped(.Vulkan);
-const check = utility.vulkanCheckResult;
+const vertex_attributes = @import("vertex_attributes.zig");
 
 const Device = @import("device.zig").Device;
 const ShaderStage = @import("shader_module.zig").ShaderStage;
 const ShaderModule = @import("shader_module.zig").ShaderModule;
+const VertexAttribute = vertex_attributes.VertexAttribute;
+
+const log = std.log.scoped(.Vulkan);
+const check = utility.vulkanCheckResult;
 
 pub const PipelineBuilder = struct {
     const ShaderStages = std.ArrayListUnmanaged(struct {
@@ -18,8 +21,8 @@ pub const PipelineBuilder = struct {
     device: *Device,
 
     shader_stages: ShaderStages,
-    vertex_binding_descriptions: []const c.VkVertexInputBindingDescription = &.{},
-    vertex_attribute_descriptions: []const c.VkVertexInputAttributeDescription = &.{},
+    vertex_binding_descriptions: std.ArrayListUnmanaged(c.VkVertexInputBindingDescription) = .{},
+    vertex_attribute_descriptions: std.ArrayListUnmanaged(c.VkVertexInputAttributeDescription) = .{},
     color_attachment_format: c.VkFormat = c.VK_FORMAT_UNDEFINED,
     depth_attachment_format: c.VkFormat = c.VK_FORMAT_UNDEFINED,
     stencil_attachment_format: c.VkFormat = c.VK_FORMAT_UNDEFINED,
@@ -28,7 +31,7 @@ pub const PipelineBuilder = struct {
     pub fn init(device: *Device) !PipelineBuilder {
         return PipelineBuilder{
             .device = device,
-            .shader_stages = try ShaderStages.initCapacity(memory.default_allocator, @typeInfo(ShaderStage).Enum.fields.len),
+            .shader_stages = try ShaderStages.initCapacity(memory.frame_allocator, @typeInfo(ShaderStage).Enum.fields.len),
         };
     }
 
@@ -36,7 +39,10 @@ pub const PipelineBuilder = struct {
         for (self.shader_stages.items) |*shader_stage| {
             shader_stage.module.deinit();
         }
-        self.shader_stages.deinit(memory.default_allocator);
+        self.shader_stages.deinit(memory.frame_allocator);
+
+        self.vertex_binding_descriptions.deinit(memory.frame_allocator);
+        self.vertex_attribute_descriptions.deinit(memory.frame_allocator);
     }
 
     pub fn loadShaderModule(self: *PipelineBuilder, shader_stage: ShaderStage, path: []const u8) !void {
@@ -49,9 +55,21 @@ pub const PipelineBuilder = struct {
         });
     }
 
-    pub fn setVertexInputType(self: *PipelineBuilder, comptime vertex_type: type) void {
-        self.vertex_binding_descriptions = &.{vertex_type.binding_description};
-        self.vertex_attribute_descriptions = &vertex_type.attribute_descriptions;
+    pub fn addVertexAttribute(self: *PipelineBuilder, attribute: VertexAttribute, instanced: bool) !void {
+        const binding_description = c.VkVertexInputBindingDescription{
+            .binding = @intCast(self.vertex_binding_descriptions.items.len),
+            .stride = vertex_attributes.getVertexAttributeSize(attribute),
+            .inputRate = if (!instanced) c.VK_VERTEX_INPUT_RATE_VERTEX else c.VK_VERTEX_INPUT_RATE_INSTANCE,
+        };
+        try self.vertex_binding_descriptions.append(memory.frame_allocator, binding_description);
+
+        const attribute_description = c.VkVertexInputAttributeDescription{
+            .location = @intCast(self.vertex_attribute_descriptions.items.len),
+            .binding = binding_description.binding,
+            .format = vertex_attributes.getVertexAttributeFormat(attribute),
+            .offset = 0,
+        };
+        try self.vertex_attribute_descriptions.append(memory.frame_allocator, attribute_description);
     }
 
     pub fn setColorAttachmentFormat(self: *PipelineBuilder, format: c.VkFormat) void {
@@ -100,10 +118,10 @@ pub const PipelineBuilder = struct {
             .sType = c.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
             .pNext = null,
             .flags = 0,
-            .vertexBindingDescriptionCount = @intCast(self.vertex_binding_descriptions.len),
-            .pVertexBindingDescriptions = self.vertex_binding_descriptions.ptr,
-            .vertexAttributeDescriptionCount = @intCast(self.vertex_attribute_descriptions.len),
-            .pVertexAttributeDescriptions = self.vertex_attribute_descriptions.ptr,
+            .vertexBindingDescriptionCount = @intCast(self.vertex_binding_descriptions.items.len),
+            .pVertexBindingDescriptions = self.vertex_binding_descriptions.items.ptr,
+            .vertexAttributeDescriptionCount = @intCast(self.vertex_attribute_descriptions.items.len),
+            .pVertexAttributeDescriptions = self.vertex_attribute_descriptions.items.ptr,
         };
 
         const dynamic_states = &[_]c.VkDynamicState{
