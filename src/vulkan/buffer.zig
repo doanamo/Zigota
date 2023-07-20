@@ -8,7 +8,7 @@ const check = utility.vulkanCheckResult;
 const VmaAllocator = @import("vma.zig").VmaAllocator;
 
 pub const Buffer = struct {
-    vma: VmaAllocator = undefined,
+    vma: *VmaAllocator = undefined,
     handle: c.VkBuffer = null,
     allocation: c.VmaAllocation = undefined,
     size: usize = 0,

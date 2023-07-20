@@ -49,7 +49,7 @@ pub fn main() !void {
         try application.update(time_delta);
         try application.render();
 
-        memory.frame_arena_allocator.reset(.retain_capacity);
+        _ = memory.frame_arena_allocator.reset(.retain_capacity);
     }
 
     log.info("Exiting application...", .{});

@@ -307,8 +307,8 @@ pub const Renderer = struct {
             .projection = math.perspectiveFov(math.radians(90.0), width / height, 0.0001, 1000.0),
         };
 
-        try uniform_buffer.upload(&self.vulkan.vma, std.mem.asBytes(&uniform_object), 0);
-        try uniform_buffer.flush(&self.vulkan.vma, 0, c.VK_WHOLE_SIZE);
+        try uniform_buffer.upload(std.mem.asBytes(&uniform_object), 0);
+        try uniform_buffer.flush(0, c.VK_WHOLE_SIZE);
     }
 
     fn recordCommandBuffer(self: *Renderer, command_buffer: *CommandBuffer, frame_index: u32, image_index: u32) !void {
