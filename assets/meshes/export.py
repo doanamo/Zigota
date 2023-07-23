@@ -46,23 +46,36 @@ if mesh is None:
 os.makedirs(os.path.dirname(output_path), exist_ok=True)
 file = open(output_path, "wb")
 
-# Write header
+# Write file header
 file.write(struct.pack('I', 3001199146)) # Magic
 file.write(struct.pack('I', 1)) # Version
 
-# Write vertices
+# Write vertices header
+has_color_attribute = len(mesh.color_attributes) > 0
+has_uv_attribute = len(mesh.uv_layers) > 0
+
 class Attribute(enum.Flag): 
     POSITION = enum.auto()
     NORMAL = enum.auto()
     COLOR = enum.auto()
     UV = enum.auto()
 
-print("Vertex attributes: Position, Normal, Color")
-attribute_flags = Attribute.POSITION | Attribute.NORMAL | Attribute.COLOR
-file.write(struct.pack('I', attribute_flags.value)) # Vertex attributes
+attribute_flags = Attribute.POSITION | Attribute.NORMAL
 
-print("Writing " + str(len(mesh.vertices)) + " vertices...")
-file.write(struct.pack('I', len(mesh.vertices))) # Vertex count
+if has_color_attribute:
+    print("Found color attributes")
+    attribute_flags |= Attribute.COLOR
+
+if has_uv_attribute:
+    print("Found UV attributes")
+    attribute_flags |= Attribute.UV
+
+vertex_count = len(mesh.vertices)
+file.write(struct.pack('I', attribute_flags.value))
+file.write(struct.pack('I', vertex_count))
+
+# Write vertex data
+print("Writing " + str(vertex_count) + " vertices...")
 
 for vertex in mesh.vertices:
     file.write(struct.pack('fff', vertex.co.x, vertex.co.y, vertex.co.z))
@@ -70,10 +83,12 @@ for vertex in mesh.vertices:
 for vertex in mesh.vertices:
     file.write(struct.pack('fff', vertex.normal.x, vertex.normal.y, vertex.normal.z))
 
-for vertex in mesh.vertices:
-    file.write(struct.pack('ffff', 1.0, 1.0, 1.0, 1.0))
+if has_color_attribute:
+    for index, vertex in enumerate(mesh.vertices):
+        color = mesh.color_attributes[0].data[index].color
+        file.write(struct.pack('ffff', color[0], color[1], color[2], color[3]))
 
-# Write indices
+# Write indices header
 if len(mesh.vertices) < 65536:
     print("Index type: uint16")
     index_type_bytes = 2
@@ -83,9 +98,12 @@ else:
     index_type_bytes = 4
     index_pack = 'III'
 
-file.write(struct.pack('I', index_type_bytes)) # Index type bytes
-file.write(struct.pack('I', len(mesh.polygons) * 3)) # Index count
-print("Writing " + str(len(mesh.polygons)) + " polygons...")
+index_count = len(mesh.polygons) * 3
+file.write(struct.pack('I', index_type_bytes))
+file.write(struct.pack('I', index_count))
+
+# Write index data
+print("Writing " + str(index_count) + " indices...")
 
 for face in mesh.polygons:
     file.write(struct.pack(index_pack, face.vertices[0], face.vertices[1], face.vertices[2]))
