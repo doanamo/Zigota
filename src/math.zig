@@ -52,7 +52,7 @@ pub fn rotation(angles: Vec3) Mat4 {
 }
 
 pub fn perspectiveFov(fovy: f32, aspect: f32, near: f32, far: f32) Mat4 {
-    // Left handed perspective projection matrix with depth in [0.0, 1.0] range
+    // Perspective projection in right handed coordinates (OpenGL default) with depth in [0.0, 1.0] range
     const tanHalfFovy = @tan(fovy * 0.5);
 
     const w = 1 / (aspect * tanHalfFovy);
