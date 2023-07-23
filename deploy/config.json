@@ -6,7 +6,7 @@
     },
     "vulkan": {
         "swapchain": {
-            "present_mode": "Mailbox"
+            "present_mode": "Immediate"
         },
         "transfer": {
             "staging_size_kb": 64
