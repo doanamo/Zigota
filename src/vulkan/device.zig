@@ -180,9 +180,15 @@ pub const Device = struct {
             .timelineSemaphore = c.VK_TRUE,
         };
 
+        var memory_priority_feature = c.VkPhysicalDeviceMemoryPriorityFeaturesEXT{
+            .sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PRIORITY_FEATURES_EXT,
+            .pNext = &timeline_semaphore_features,
+            .memoryPriority = c.VK_TRUE,
+        };
+
         const create_info = c.VkDeviceCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-            .pNext = &timeline_semaphore_features,
+            .pNext = &memory_priority_feature,
             .flags = 0,
             .queueCreateInfoCount = queue_create_infos.len,
             .pQueueCreateInfos = &queue_create_infos,
