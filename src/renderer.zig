@@ -268,7 +268,11 @@ pub const Renderer = struct {
         try builder.addVertexAttribute(.Normal, false);
         try builder.addVertexAttribute(.Color, false);
 
+        builder.setDepthTest(true);
+        builder.setDepthWrite(true);
         builder.setColorAttachmentFormat(self.vulkan.swapchain.image_format);
+        builder.setDepthAttachmentFormat(self.vulkan.swapchain.depth_stencil_image_format);
+        builder.setStencilAttachmentFormat(self.vulkan.swapchain.depth_stencil_image_format);
         builder.setPipelineLayout(self.layout_pipeline);
 
         self.pipeline = try builder.build();
@@ -328,6 +332,24 @@ pub const Renderer = struct {
             },
         };
 
+        const depth_stencil_attachment_info = c.VkRenderingAttachmentInfo{
+            .sType = c.VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .pNext = null,
+            .imageView = self.vulkan.swapchain.depth_stencil_image_view,
+            .imageLayout = c.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            .resolveMode = c.VK_RESOLVE_MODE_NONE,
+            .resolveImageView = null,
+            .resolveImageLayout = c.VK_IMAGE_LAYOUT_UNDEFINED,
+            .loadOp = c.VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = c.VK_ATTACHMENT_STORE_OP_STORE,
+            .clearValue = c.VkClearValue{
+                .depthStencil = c.VkClearDepthStencilValue{
+                    .depth = 1.0,
+                    .stencil = 0,
+                },
+            },
+        };
+
         const rendering_info = c.VkRenderingInfo{
             .sType = c.VK_STRUCTURE_TYPE_RENDERING_INFO,
             .pNext = null,
@@ -343,8 +365,8 @@ pub const Renderer = struct {
             .viewMask = 0,
             .colorAttachmentCount = 1,
             .pColorAttachments = &color_attachment_info,
-            .pDepthAttachment = null,
-            .pStencilAttachment = null,
+            .pDepthAttachment = &depth_stencil_attachment_info,
+            .pStencilAttachment = &depth_stencil_attachment_info,
         };
 
         c.vkCmdBeginRendering.?(command_buffer.handle, &rendering_info);

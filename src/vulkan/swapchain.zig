@@ -9,7 +9,9 @@ const check = utility.vulkanCheckResult;
 const Window = @import("../glfw/window.zig").Window;
 const Surface = @import("surface.zig").Surface;
 const Device = @import("device.zig").Device;
+const VmaAllocator = @import("vma.zig").VmaAllocator;
 const CommandBuffer = @import("command_buffer.zig").CommandBuffer;
+const Image = @import("image.zig").Image;
 
 pub const Swapchain = struct {
     pub const PresentMode = enum(c.VkPresentModeKHR) {
@@ -27,6 +29,7 @@ pub const Swapchain = struct {
     window: *Window = undefined,
     surface: *Surface = undefined,
     device: *Device = undefined,
+    vma: *VmaAllocator = undefined,
 
     images: std.ArrayListUnmanaged(c.VkImage) = .{},
     image_views: std.ArrayListUnmanaged(c.VkImageView) = .{},
@@ -34,16 +37,21 @@ pub const Swapchain = struct {
     color_space: c.VkColorSpaceKHR = undefined,
     extent: c.VkExtent2D = undefined,
 
+    depth_stencil_image: Image = .{},
+    depth_stencil_image_view: c.VkImageView = null,
+    depth_stencil_image_format: c.VkFormat = undefined,
+
     max_inflight_frames: u32 = undefined,
     image_available_semaphores: std.ArrayListUnmanaged(c.VkSemaphore) = .{},
     frame_finished_semaphores: std.ArrayListUnmanaged(c.VkSemaphore) = .{},
     frame_inflight_fences: std.ArrayListUnmanaged(c.VkFence) = .{},
     frame_index: u32 = 0,
 
-    pub fn init(self: *Swapchain, window: *Window, surface: *Surface, device: *Device) !void {
+    pub fn init(self: *Swapchain, window: *Window, surface: *Surface, device: *Device, vma: *VmaAllocator) !void {
         self.window = window;
         self.surface = surface;
         self.device = device;
+        self.vma = vma;
         errdefer self.deinit();
 
         self.createSwapchain() catch {
@@ -56,6 +64,11 @@ pub const Swapchain = struct {
             return error.FailedToCreateImageViews;
         };
 
+        self.createDepthStencilBuffer(false) catch {
+            log.err("Failed to create depth stencil buffer", .{});
+            return error.FailedToCreateDepthStencilBuffer;
+        };
+
         self.createImageSynchronization() catch {
             log.err("Failed to create image synchronization", .{});
             return error.FailedToCreateImageSynchronization;
@@ -64,6 +77,7 @@ pub const Swapchain = struct {
 
     pub fn deinit(self: *Swapchain) void {
         self.destroyImageSynchronization();
+        self.destroyDepthStencilBuffer(false);
         self.destroyImageViews(false);
         self.destroySwapchain();
         self.* = undefined;
@@ -139,7 +153,7 @@ pub const Swapchain = struct {
 
         try self.image_views.ensureTotalCapacityPrecise(memory.default_allocator, image_count);
         for (self.images.items) |image| {
-            const create_info = &c.VkImageViewCreateInfo{
+            const create_info = c.VkImageViewCreateInfo{
                 .sType = c.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                 .pNext = null,
                 .flags = 0,
@@ -162,7 +176,7 @@ pub const Swapchain = struct {
             };
 
             var image_view: c.VkImageView = null;
-            try check(c.vkCreateImageView.?(self.device.handle, create_info, memory.vulkan_allocator, &image_view));
+            try check(c.vkCreateImageView.?(self.device.handle, &create_info, memory.vulkan_allocator, &image_view));
             try self.image_views.append(memory.default_allocator, image_view);
         }
     }
@@ -178,6 +192,61 @@ pub const Swapchain = struct {
         } else {
             self.image_views.deinit(memory.default_allocator);
             self.images.deinit(memory.default_allocator);
+        }
+    }
+
+    fn createDepthStencilBuffer(self: *Swapchain, recreating: bool) !void {
+        log.info("Creating swapchain depth stencil buffer...", .{});
+        errdefer self.destroyDepthStencilBuffer(recreating);
+
+        self.depth_stencil_image_format = c.VK_FORMAT_D32_SFLOAT_S8_UINT;
+
+        try self.depth_stencil_image.init(self.vma, .{
+            .format = self.depth_stencil_image_format,
+            .extent = .{
+                .width = self.extent.width,
+                .height = self.extent.height,
+                .depth = 1,
+            },
+            .usage_flags = c.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            .memory_flags = c.VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
+            .memory_priority = 1.0,
+        });
+
+        const image_view_create_info = c.VkImageViewCreateInfo{
+            .sType = c.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+            .pNext = null,
+            .flags = 0,
+            .image = self.depth_stencil_image.handle,
+            .viewType = c.VK_IMAGE_VIEW_TYPE_2D,
+            .format = self.depth_stencil_image_format,
+            .components = c.VkComponentMapping{
+                .r = c.VK_COMPONENT_SWIZZLE_IDENTITY,
+                .g = c.VK_COMPONENT_SWIZZLE_IDENTITY,
+                .b = c.VK_COMPONENT_SWIZZLE_IDENTITY,
+                .a = c.VK_COMPONENT_SWIZZLE_IDENTITY,
+            },
+            .subresourceRange = c.VkImageSubresourceRange{
+                .aspectMask = c.VK_IMAGE_ASPECT_DEPTH_BIT | c.VK_IMAGE_ASPECT_STENCIL_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+        };
+
+        try check(c.vkCreateImageView.?(self.device.handle, &image_view_create_info, memory.vulkan_allocator, &self.depth_stencil_image_view));
+    }
+
+    fn destroyDepthStencilBuffer(self: *Swapchain, recreating: bool) void {
+        if (self.depth_stencil_image_view != null) {
+            c.vkDestroyImageView.?(self.device.handle, self.depth_stencil_image_view, memory.vulkan_allocator);
+        }
+        self.depth_stencil_image.deinit();
+
+        if (recreating) {
+            self.depth_stencil_image_view = null;
+            self.depth_stencil_image = .{};
         }
     }
 
@@ -237,11 +306,13 @@ pub const Swapchain = struct {
         log.info("Recreating swapchain...", .{});
         try self.surface.updateCapabilities();
 
+        self.destroyDepthStencilBuffer(true);
         self.destroyImageViews(true);
         self.destroySwapchain();
 
         try self.createSwapchain();
         try self.createImageViews(true);
+        try self.createDepthStencilBuffer(true);
     }
 
     pub fn acquireNextImage(self: *Swapchain) !struct {

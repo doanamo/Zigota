@@ -23,8 +23,8 @@ pub const Vulkan = struct {
     physical_device: PhysicalDevice = .{},
     surface: Surface = .{},
     device: Device = .{},
-    swapchain: Swapchain = .{},
     vma: VmaAllocator = .{},
+    swapchain: Swapchain = .{},
     transfer: Transfer = .{},
 
     pub fn init(self: *Vulkan, window: *Window) !void {
@@ -35,8 +35,8 @@ pub const Vulkan = struct {
         try self.physical_device.init(&self.instance);
         try self.surface.init(window, &self.instance, &self.physical_device);
         try self.device.init(&self.physical_device, &self.surface);
-        try self.swapchain.init(window, &self.surface, &self.device);
         try self.vma.init(&self.instance, &self.physical_device, &self.device);
+        try self.swapchain.init(window, &self.surface, &self.device, &self.vma);
         try self.transfer.init(&self.device, &self.vma);
     }
 
@@ -45,8 +45,8 @@ pub const Vulkan = struct {
         self.device.waitIdle();
 
         self.transfer.deinit();
-        self.vma.deinit();
         self.swapchain.deinit();
+        self.vma.deinit();
         self.device.deinit();
         self.surface.deinit();
         self.physical_device.deinit();

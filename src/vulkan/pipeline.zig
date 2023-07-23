@@ -19,13 +19,15 @@ pub const PipelineBuilder = struct {
     });
 
     device: *Device,
-
     shader_stages: ShaderStages,
     vertex_binding_descriptions: std.ArrayListUnmanaged(c.VkVertexInputBindingDescription) = .{},
     vertex_attribute_descriptions: std.ArrayListUnmanaged(c.VkVertexInputAttributeDescription) = .{},
     color_attachment_format: c.VkFormat = c.VK_FORMAT_UNDEFINED,
     depth_attachment_format: c.VkFormat = c.VK_FORMAT_UNDEFINED,
     stencil_attachment_format: c.VkFormat = c.VK_FORMAT_UNDEFINED,
+    depth_test_enable: bool = false,
+    depth_write_enable: bool = false,
+    stencil_test_enable: bool = false,
     pipeline_layout: c.VkPipelineLayout = null,
 
     pub fn init(device: *Device) !PipelineBuilder {
@@ -83,6 +85,18 @@ pub const PipelineBuilder = struct {
 
     pub fn setStencilAttachmentFormat(self: *PipelineBuilder, format: c.VkFormat) void {
         self.stencil_attachment_format = format;
+    }
+
+    pub fn setDepthTest(self: *PipelineBuilder, test_enable: bool) void {
+        self.depth_test_enable = test_enable;
+    }
+
+    pub fn setDepthWrite(self: *PipelineBuilder, write_enable: bool) void {
+        self.depth_write_enable = write_enable;
+    }
+
+    pub fn setStencilTest(self: *PipelineBuilder, test_enable: bool) void {
+        self.stencil_test_enable = test_enable;
     }
 
     pub fn setPipelineLayout(self: *PipelineBuilder, pipeline_layout: c.VkPipelineLayout) void {
@@ -176,6 +190,37 @@ pub const PipelineBuilder = struct {
             .alphaToOneEnable = c.VK_FALSE,
         };
 
+        const depth_stencil_state_create_info = c.VkPipelineDepthStencilStateCreateInfo{
+            .sType = c.VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+            .pNext = null,
+            .flags = 0,
+            .depthTestEnable = if (self.depth_test_enable) c.VK_TRUE else c.VK_FALSE,
+            .depthWriteEnable = if (self.depth_write_enable) c.VK_TRUE else c.VK_FALSE,
+            .depthCompareOp = c.VK_COMPARE_OP_LESS_OR_EQUAL,
+            .depthBoundsTestEnable = c.VK_FALSE,
+            .stencilTestEnable = if (self.stencil_test_enable) c.VK_TRUE else c.VK_FALSE,
+            .front = c.VkStencilOpState{
+                .failOp = c.VK_STENCIL_OP_KEEP,
+                .passOp = c.VK_STENCIL_OP_KEEP,
+                .depthFailOp = c.VK_STENCIL_OP_KEEP,
+                .compareOp = c.VK_COMPARE_OP_ALWAYS,
+                .compareMask = 0,
+                .writeMask = 0,
+                .reference = 0,
+            },
+            .back = c.VkStencilOpState{
+                .failOp = c.VK_STENCIL_OP_KEEP,
+                .passOp = c.VK_STENCIL_OP_KEEP,
+                .depthFailOp = c.VK_STENCIL_OP_KEEP,
+                .compareOp = c.VK_COMPARE_OP_ALWAYS,
+                .compareMask = 0,
+                .writeMask = 0,
+                .reference = 0,
+            },
+            .minDepthBounds = 0.0,
+            .maxDepthBounds = 1.0,
+        };
+
         const color_blend_attachment_state = c.VkPipelineColorBlendAttachmentState{
             .blendEnable = c.VK_FALSE,
             .srcColorBlendFactor = c.VK_BLEND_FACTOR_ONE,
@@ -220,7 +265,7 @@ pub const PipelineBuilder = struct {
             .pViewportState = &viewport_state_create_info,
             .pRasterizationState = &rasterization_state_create_info,
             .pMultisampleState = &multisample_state_create_info,
-            .pDepthStencilState = null,
+            .pDepthStencilState = &depth_stencil_state_create_info,
             .pColorBlendState = &color_blend_state_create_info,
             .pDynamicState = &dynamic_state_create_info,
             .layout = self.pipeline_layout,

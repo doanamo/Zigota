@@ -19,6 +19,7 @@ pub const Buffer = struct {
         sharing_mode: c.VkSharingMode = c.VK_SHARING_MODE_EXCLUSIVE,
         memory_usage: c.VmaMemoryUsage = c.VMA_MEMORY_USAGE_AUTO,
         memory_flags: c.VmaPoolCreateFlags = 0,
+        memory_priority: f32 = 0.0,
     }) !void {
         self.vma = vma;
         self.size = params.size;
@@ -43,7 +44,7 @@ pub const Buffer = struct {
             .memoryTypeBits = 0,
             .pool = null,
             .pUserData = null,
-            .priority = 0,
+            .priority = params.memory_priority,
         };
 
         var allocation_info: c.VmaAllocationInfo = undefined;
