@@ -13,7 +13,7 @@ const VertexAttributeFlags = vertex_attributes.VertexAttributeFlags;
 pub const Mesh = struct {
     const FileHeader = extern struct {
         const expected_magic = 0xB2E2AA2A; // 30-01-1991 46
-        const expected_version = 1;
+        const expected_version = 2;
 
         magic: u32,
         version: u32,

@@ -48,7 +48,7 @@ file = open(output_path, "wb")
 
 # Write file header
 file.write(struct.pack('I', 3001199146)) # Magic
-file.write(struct.pack('I', 1)) # Version
+file.write(struct.pack('I', 2)) # Version
 
 # Write vertices header
 has_color_attribute = len(mesh.color_attributes) > 0
@@ -86,7 +86,11 @@ for vertex in mesh.vertices:
 if has_color_attribute:
     for index, vertex in enumerate(mesh.vertices):
         color = mesh.color_attributes[0].data[index].color
-        file.write(struct.pack('ffff', color[0], color[1], color[2], color[3]))
+        file.write(struct.pack('BBBB',
+            int(color[0] * 255 + 0.5),
+            int(color[1] * 255 + 0.5),
+            int(color[2] * 255 + 0.5),
+            int(color[3] * 255 + 0.5)))
 
 # Write indices header
 if len(mesh.vertices) < 65536:

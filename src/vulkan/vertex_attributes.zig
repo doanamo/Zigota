@@ -30,7 +30,6 @@ pub const VertexAttributeFlags = packed struct(u32) {
             .Normal => return self.normal,
             .Color => return self.color,
             .UV => return self.uv,
-            else => return false,
         }
     }
 
@@ -45,10 +44,6 @@ pub const VertexAttributeFlags = packed struct(u32) {
 };
 
 pub const VertexAttributeType = enum {
-    Float2,
-    Float3,
-    Float4,
-
     Position,
     Normal,
     Color,
@@ -57,16 +52,16 @@ pub const VertexAttributeType = enum {
 
 pub fn getVertexAttributeSize(attribute: VertexAttributeType) u32 {
     switch (attribute) {
-        .Float2, .UV => return @sizeOf([2]f32),
-        .Float3, .Position, .Normal => return @sizeOf([3]f32),
-        .Float4, .Color => return @sizeOf([4]f32),
+        .UV => return @sizeOf([2]f32),
+        .Position, .Normal => return @sizeOf([3]f32),
+        .Color => return @sizeOf([4]u8),
     }
 }
 
 pub fn getVertexAttributeFormat(attribute: VertexAttributeType) c.VkFormat {
     switch (attribute) {
-        .Float2, .UV => return c.VK_FORMAT_R32G32_SFLOAT,
-        .Float3, .Position, .Normal => return c.VK_FORMAT_R32G32B32_SFLOAT,
-        .Float4, .Color => return c.VK_FORMAT_R32G32B32A32_SFLOAT,
+        .UV => return c.VK_FORMAT_R32G32_SFLOAT,
+        .Position, .Normal => return c.VK_FORMAT_R32G32B32_SFLOAT,
+        .Color => return c.VK_FORMAT_R8G8B8A8_UNORM,
     }
 }
