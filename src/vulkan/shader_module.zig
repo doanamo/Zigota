@@ -18,22 +18,20 @@ pub const ShaderModule = struct {
     handle: c.VkShaderModule = null,
     device: *Device = undefined,
 
-    pub fn loadFromFile(device: *Device, path: []const u8) !ShaderModule {
+    pub fn loadFromFile(self: *ShaderModule, device: *Device, path: []const u8) !void {
         log.info("Loading shader module from \"{s}\" file...", .{path});
 
         const byte_code = try std.fs.cwd().readFileAllocOptions(
-            memory.default_allocator,
+            memory.frame_allocator,
             path,
             utility.megabytes(1),
             null,
             @alignOf(u32),
             null,
         );
-        defer memory.default_allocator.free(byte_code);
+        defer memory.frame_allocator.free(byte_code);
 
-        var shader_module: ShaderModule = .{};
-        try shader_module.init(device, byte_code);
-        return shader_module;
+        try self.init(device, byte_code);
     }
 
     pub fn init(self: *ShaderModule, device: *Device, bytes: ByteCode) !void {
