@@ -4,6 +4,9 @@ pub const Vec3 = @Vector(3, f32);
 pub const Vec4 = @Vector(4, f32);
 pub const Mat4 = [4]Vec4;
 
+pub const Vec3Component = enum { x, y, z };
+pub const Vec4Component = enum { x, y, z, w };
+
 pub fn radians(deg: f32) f32 {
     return std.math.degreesToRadians(f32, deg);
 }
@@ -29,6 +32,19 @@ pub fn identity() Mat4 {
     };
 }
 
+pub fn mul(a: Mat4, b: Mat4) Mat4 {
+    var result: Mat4 = undefined;
+    comptime var row: u32 = 0;
+    inline while (row < 4) : (row += 1) {
+        const vx = @shuffle(f32, a[row], undefined, [4]i32{ 0, 0, 0, 0 });
+        const vy = @shuffle(f32, a[row], undefined, [4]i32{ 1, 1, 1, 1 });
+        const vz = @shuffle(f32, a[row], undefined, [4]i32{ 2, 2, 2, 2 });
+        const vw = @shuffle(f32, a[row], undefined, [4]i32{ 3, 3, 3, 3 });
+        result[row] = @mulAdd(Vec4, vx, b[0], vz * b[2]) + @mulAdd(Vec4, vy, b[1], vw * b[3]);
+    }
+    return result;
+}
+
 pub fn translation(offset: Vec3) Mat4 {
     return .{
         Vec4{ 1.0, 0.0, 0.0, 0.0 },
@@ -47,6 +63,15 @@ pub fn rotation(angles: Vec3) Mat4 {
         Vec4{ c[1] * c[2], t[0] * s[1] + c[0] * s[2], -t[1] * s[1] + s[0] * s[2], 0.0 },
         Vec4{ -c[1] * s[2], t[1] - s[0] * t[2], t[0] + c[0] * t[2], 0.0 },
         Vec4{ s[1], -c[1] * s[0], c[0] * c[1], 0.0 },
+        Vec4{ 0.0, 0.0, 0.0, 1.0 },
+    };
+}
+
+pub fn scaling(scale: Vec3) Mat4 {
+    return .{
+        Vec4{ scale[0], 0.0, 0.0, 0.0 },
+        Vec4{ 0.0, scale[1], 0.0, 0.0 },
+        Vec4{ 0.0, 0.0, scale[2], 0.0 },
         Vec4{ 0.0, 0.0, 0.0, 1.0 },
     };
 }

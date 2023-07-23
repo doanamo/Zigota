@@ -290,11 +290,10 @@ pub const Renderer = struct {
         const camera_position = math.Vec3{ 0.0, 0.0, -3.0 };
 
         const uniform_object = VertexTransformUniform{
-            .model = math.rotation(math.Vec3{
-                math.radians(30.0) * self.time,
-                0.0,
-                math.radians(30.0) * self.time,
-            }),
+            .model = math.mul(
+                math.scaling(math.Vec3{ 0.33, 0.33, 0.33 }),
+                math.rotation(math.Vec3{ math.radians(30.0) * self.time, 0.0, math.radians(30.0) * self.time }),
+            ),
             .view = math.translation(camera_position * math.splat3(-1.0)),
             .projection = math.perspectiveFov(math.radians(90.0), width / height, 0.0001, 1000.0),
         };
@@ -416,9 +415,8 @@ pub const Renderer = struct {
             if (err == error.SwapchainOutOfDate) {
                 try self.recreateSwapchain();
                 return;
-            } else {
-                return err;
             }
+            return err;
         };
 
         const frame_index = self.vulkan.swapchain.frame_index;
