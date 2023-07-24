@@ -1,31 +1,43 @@
 const std = @import("std");
 
 const Environment = struct {
-    vulkan_sdk: []u8,
-    vulkan_include: []u8,
-    vulkan_lib: []u8,
+    vulkan_sdk_path: []const u8,
+    vulkan_include_path: [:0]const u8,
+    vulkan_lib_path: [:0]const u8,
+    vulkan_bin_path: [:0]const u8,
+    vulkan_glslc_path: [:0]const u8,
 
     pub fn init() !Environment {
-        const vulkan_sdk = try std.process.getEnvVarOwned(allocator, "VULKAN_SDK");
-        errdefer allocator.free(vulkan_sdk);
+        const vulkan_sdk_path = try std.process.getEnvVarOwned(allocator, "VULKAN_SDK");
+        errdefer allocator.free(vulkan_sdk_path);
 
-        const vulkan_include = try std.fmt.allocPrintZ(allocator, "{s}{s}", .{ vulkan_sdk, "/Include/" });
-        errdefer allocator.free(vulkan_include);
+        const vulkan_include_path = try std.fs.path.joinZ(allocator, &[_][]const u8{ vulkan_sdk_path, "Include" });
+        errdefer allocator.free(vulkan_include_path);
 
-        const vulkan_lib = try std.fmt.allocPrintZ(allocator, "{s}{s}", .{ vulkan_sdk, "/Lib/" });
-        errdefer allocator.free(vulkan_lib);
+        const vulkan_lib_path = try std.fs.path.joinZ(allocator, &[_][]const u8{ vulkan_sdk_path, "Lib" });
+        errdefer allocator.free(vulkan_lib_path);
+
+        const vulkan_bin_path = try std.fs.path.joinZ(allocator, &[_][]const u8{ vulkan_sdk_path, "Bin" });
+        errdefer allocator.free(vulkan_bin_path);
+
+        const vulkan_glslc_path = try std.fs.path.joinZ(allocator, &[_][]const u8{ vulkan_bin_path, "glslc.exe" });
+        errdefer allocator.free(vulkan_glslc_path);
 
         return Environment{
-            .vulkan_sdk = vulkan_sdk,
-            .vulkan_include = vulkan_include,
-            .vulkan_lib = vulkan_lib,
+            .vulkan_sdk_path = vulkan_sdk_path,
+            .vulkan_include_path = vulkan_include_path,
+            .vulkan_lib_path = vulkan_lib_path,
+            .vulkan_bin_path = vulkan_bin_path,
+            .vulkan_glslc_path = vulkan_glslc_path,
         };
     }
 
     pub fn deinit(self: *Environment) void {
-        allocator.free(self.vulkan_sdk);
-        allocator.free(self.vulkan_include);
-        allocator.free(self.vulkan_lib);
+        allocator.free(self.vulkan_sdk_path);
+        allocator.free(self.vulkan_include_path);
+        allocator.free(self.vulkan_lib_path);
+        allocator.free(self.vulkan_bin_path);
+        allocator.free(self.vulkan_glslc_path);
     }
 };
 
@@ -159,7 +171,7 @@ fn addDependencyVolk(builder: *std.build.Builder, exe: *std.build.LibExeObjStep)
         else => unreachable,
     }
 
-    volk.addIncludePath(environment.vulkan_include);
+    volk.addIncludePath(environment.vulkan_include_path);
     volk.addIncludePath("deps/volk/");
     volk.addCSourceFile("deps/volk/volk.c", flags.items);
     volk.linkLibC();
@@ -180,11 +192,11 @@ fn addDependencyVulkan(builder: *std.build.Builder, exe: *std.build.LibExeObjSte
 
     try flags.append("-std=c++11");
 
-    vulkan.addIncludePath(environment.vulkan_include);
+    vulkan.addIncludePath(environment.vulkan_include_path);
     vulkan.addCSourceFile("src/c/vulkan.cpp", flags.items);
     vulkan.linkLibCpp();
 
-    exe.addIncludePath(environment.vulkan_include);
+    exe.addIncludePath(environment.vulkan_include_path);
     exe.linkLibrary(vulkan);
 }
 
@@ -200,7 +212,7 @@ fn addDependencyVma(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) 
 
     try flags.append("-std=c++14");
 
-    vma.addIncludePath(environment.vulkan_include);
+    vma.addIncludePath(environment.vulkan_include_path);
     vma.addIncludePath("deps/vma/src/");
     vma.addCSourceFile("src/c/vma.cpp", flags.items);
     vma.linkLibCpp();
@@ -211,11 +223,23 @@ fn addDependencyVma(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) 
 
 fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
     const input_dir_path = "assets/shaders/";
-    const output_dir_path = "deploy/data/shaders/";
-
-    try std.fs.cwd().makePath(output_dir_path);
     var input_dir = try std.fs.cwd().openIterableDir(input_dir_path, .{});
     defer input_dir.close();
+
+    const output_dir_path = "deploy/data/shaders/";
+    try std.fs.cwd().makePath(output_dir_path);
+
+    var vulkan_bin_dir = try std.fs.openDirAbsolute(environment.vulkan_bin_path, .{});
+    defer vulkan_bin_dir.close();
+
+    var cache = std.Build.Cache{
+        .gpa = allocator,
+        .manifest_dir = try std.fs.cwd().makeOpenPath("zig-cache/assets/shaders/", .{}),
+    };
+
+    cache.addPrefix(.{ .path = input_dir_path, .handle = input_dir.dir });
+    cache.addPrefix(.{ .path = environment.vulkan_bin_path, .handle = vulkan_bin_dir });
+    defer cache.manifest_dir.close();
 
     var walker = try input_dir.walk(allocator);
     defer walker.deinit();
@@ -225,14 +249,23 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
             continue;
         }
 
-        const input_file_path = try std.fs.path.join(allocator, &[_][]const u8{ input_dir_path, entry.path });
+        const input_file_path = try std.fs.path.joinZ(allocator, &[_][]const u8{ input_dir_path, entry.path });
         defer allocator.free(input_file_path);
 
         const output_file_path = try std.fmt.allocPrint(allocator, "{s}{s}.spv", .{ output_dir_path, entry.basename });
         defer allocator.free(output_file_path);
 
+        var manifest = cache.obtain();
+        defer manifest.deinit();
+
+        _ = try manifest.addFile(environment.vulkan_glslc_path, null);
+        _ = try manifest.addFile(entry.path, null);
+        if (try manifest.hit()) {
+            continue;
+        }
+
         const glslc = builder.addSystemCommand(&[_][]const u8{
-            "glslc",
+            environment.vulkan_glslc_path,
             "-O",
             "-o",
             output_file_path,
@@ -240,6 +273,8 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
         });
 
         exe.step.dependOn(&glslc.step);
+
+        try manifest.writeManifest();
     }
 }
 

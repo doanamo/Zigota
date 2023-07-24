@@ -27,6 +27,20 @@
             "args": [],
             "cwd": "${workspaceFolder}/deploy/",
             "console": "internalConsole",
+        },
+        {
+            // This is just an example of how to run build.zig under debugger
+            // Paths need to be manually adjusted to your environment
+            "type": "cppvsdbg",
+            "request": "launch",
+            "name": "Zig Build",
+            "program": "${workspaceFolder}/zig-cache/o/343ed99cdcbe1d58657aab41055075e4/build.exe",
+            "args": [
+                "C:/Zig/zig-windows-x86_64-0.11.0-dev.3947+89396ff02/zig.exe",
+                ".", "./zig-cache", "C:/Users/doanp/AppData/Local/zig",
+                "-Doptimize=Debug", "--prefix-exe-dir", "bin/debug"
+            ],
+            "cwd": "${workspaceFolder}",
         }
     ]
 }
