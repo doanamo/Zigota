@@ -32,13 +32,13 @@ pub const Application = struct {
             root.project_version,
         });
 
-        heap.window = Window.init(title) catch {
-            log.err("Failed to initialize window", .{});
+        heap.window = Window.init(title) catch |err| {
+            log.err("Failed to initialize window: {}", .{err});
             return error.FailedToInitializeWindow;
         };
 
-        heap.renderer = Renderer.init(&heap.window) catch {
-            log.err("Failed to initialize renderer", .{});
+        heap.renderer = Renderer.init(&heap.window) catch |err| {
+            log.err("Failed to initialize renderer: {}", .{err});
             return error.FailedToInitializeRenderer;
         };
 

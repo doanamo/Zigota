@@ -1,11 +1,14 @@
 const c = @import("c.zig");
 const std = @import("std");
+const log = std.log.scoped(.Memory);
 
 pub var frame_arena_allocator: std.heap.ArenaAllocator = undefined;
 pub var frame_allocator: std.mem.Allocator = undefined;
 pub var default_allocator: std.mem.Allocator = undefined;
 
 pub fn init() !void {
+    log.info("Initializing...", .{});
+
     if (std.debug.runtime_safety) {
         c.mi_option_enable(c.mi_option_show_errors);
         c.mi_option_enable(c.mi_option_show_stats);

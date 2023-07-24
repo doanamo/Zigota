@@ -50,12 +50,25 @@ pub const Buffer = struct {
         };
 
         var allocation_info: c.VmaAllocationInfo = undefined;
-        check(c.vmaCreateBuffer(vma.handle, &buffer_create_info, &allocation_create_info, &self.handle, &self.allocation, &allocation_info)) catch {
-            log.err("Failed to create buffer (size {} bytes)", .{params.size});
+        check(c.vmaCreateBuffer(vma.handle, &buffer_create_info, &allocation_create_info, &self.handle, &self.allocation, &allocation_info)) catch |err| {
+            log.err("Failed to create buffer ({} bytes): {}", .{ params.size, err });
             return error.FailedToCreateBuffer;
         };
 
-        log.info("Created buffer (size {} bytes)", .{params.size});
+        var buffer_name: [:0]const u8 = undefined;
+        if (params.usage_flags & c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT != 0) {
+            buffer_name = "staging buffer";
+        } else if (params.usage_flags & c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT != 0) {
+            buffer_name = "vertex buffer";
+        } else if (params.usage_flags & c.VK_BUFFER_USAGE_INDEX_BUFFER_BIT != 0) {
+            buffer_name = "index buffer";
+        } else if (params.usage_flags & c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT != 0) {
+            buffer_name = "uniform buffer";
+        } else {
+            buffer_name = "buffer";
+        }
+
+        log.info("Created {s} ({} bytes)", .{ buffer_name, params.size });
         return self;
     }
 

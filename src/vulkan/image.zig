@@ -59,11 +59,25 @@ pub const Image = struct {
         };
 
         var allocation_info: c.VmaAllocationInfo = undefined;
-        check(c.vmaCreateImage(vma.handle, &image_create_info, &allocation_create_info, &self.handle, &self.allocation, &allocation_info)) catch {
-            log.err("Failed to create image", .{});
+        check(c.vmaCreateImage(vma.handle, &image_create_info, &allocation_create_info, &self.handle, &self.allocation, &allocation_info)) catch |err| {
+            log.err("Failed to create image: {}", .{err});
             return error.FailedToCreateImage;
         };
 
+        var image_name: [:0]const u8 = undefined;
+        if (params.usage_flags & c.VK_IMAGE_USAGE_TRANSFER_SRC_BIT != 0) {
+            image_name = "staging image";
+        } else if (params.usage_flags & c.VK_IMAGE_USAGE_SAMPLED_BIT != 0) {
+            image_name = "sampled image";
+        } else if (params.usage_flags & c.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT != 0) {
+            image_name = "color attachment image";
+        } else if (params.usage_flags & c.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT != 0) {
+            image_name = "depth stencil attachment image";
+        } else {
+            image_name = "image";
+        }
+
+        log.info("Created {s} ({} bytes)", .{ image_name, allocation_info.size });
         return self;
     }
 

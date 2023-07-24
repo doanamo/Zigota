@@ -32,13 +32,13 @@ pub const Device = struct {
         var self = Device{};
         errdefer self.deinit();
 
-        self.selectQueueFamilies(physical_device, surface) catch {
-            log.err("Failed to select queue families", .{});
+        self.selectQueueFamilies(physical_device, surface) catch |err| {
+            log.err("Failed to select queue families: {}", .{err});
             return error.FailedToSelectQueueFamilies;
         };
 
-        self.createLogicalDevice(physical_device) catch {
-            log.err("Failed to create logical device", .{});
+        self.createLogicalDevice(physical_device) catch |err| {
+            log.err("Failed to create logical device: {}", .{err});
             return error.FailedToCreateLogicalDevice;
         };
 

@@ -11,13 +11,7 @@ pub const VertexAttributeFlags = packed struct(u32) {
     padding: u28 = undefined,
 
     pub fn isValid(self: VertexAttributeFlags) bool {
-        var enabled_count: u32 = 0;
-        if (self.position) enabled_count += 1;
-        if (self.normal) enabled_count += 1;
-        if (self.color) enabled_count += 1;
-        if (self.uv) enabled_count += 1;
-
-        if (enabled_count > max_attributes) {
+        if (self.getAttributeCount() > max_attributes) {
             return false;
         }
 
@@ -33,7 +27,16 @@ pub const VertexAttributeFlags = packed struct(u32) {
         }
     }
 
-    pub fn getCombinedSize(self: VertexAttributeFlags) u32 {
+    pub fn getAttributeCount(self: VertexAttributeFlags) u32 {
+        var count: u32 = 0;
+        if (self.position) count += 1;
+        if (self.normal) count += 1;
+        if (self.color) count += 1;
+        if (self.uv) count += 1;
+        return count;
+    }
+
+    pub fn getTotalSize(self: VertexAttributeFlags) u32 {
         var size: u32 = 0;
         if (self.position) size += getVertexAttributeSize(.Position);
         if (self.normal) size += getVertexAttributeSize(.Normal);

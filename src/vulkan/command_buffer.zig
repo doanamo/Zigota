@@ -25,8 +25,8 @@ pub const CommandBuffer = struct {
             .commandBufferCount = 1,
         };
 
-        check(c.vkAllocateCommandBuffers.?(device.handle, &allocate_info, &self.handle)) catch {
-            log.err("Failed to create command buffer", .{});
+        check(c.vkAllocateCommandBuffers.?(device.handle, &allocate_info, &self.handle)) catch |err| {
+            log.err("Failed to create command buffer: {}", .{err});
             return error.FailedToCreateCommandBuffer;
         };
 

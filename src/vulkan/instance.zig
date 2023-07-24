@@ -17,13 +17,13 @@ pub const Instance = struct {
         var self = Instance{};
         errdefer self.deinit();
 
-        self.createInstance() catch {
-            log.err("Failed to create instance", .{});
+        self.createInstance() catch |err| {
+            log.err("Failed to create instance: {}", .{err});
             return error.FailedToCreateInstance;
         };
 
-        self.createDebugCallback() catch {
-            log.err("Failed to create debug callback", .{});
+        self.createDebugCallback() catch |err| {
+            log.err("Failed to create debug callback: {}", .{err});
             return error.FailedToCreateDebugCallback;
         };
 

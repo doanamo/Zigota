@@ -7,25 +7,32 @@ const WindowConfig = @import("glfw/window.zig").Window.Config;
 const VulkanConfig = @import("vulkan.zig").Vulkan.Config;
 
 pub const Config = struct {
+    const path = "config.json";
+
     window: WindowConfig = undefined,
     vulkan: VulkanConfig = undefined,
 
     pub fn init() !Config {
-        log.info("Loading config from file...", .{});
-
-        const content = try std.fs.cwd().readFileAllocOptions(
+        const content = std.fs.cwd().readFileAllocOptions(
             memory.default_allocator,
-            "config.json",
+            path,
             utility.megabytes(1),
             null,
             @alignOf(u8),
             null,
-        );
+        ) catch |err| {
+            log.err("Failed to load config from \"{s}\" file: {}", .{ path, err });
+            return error.FailedToLoadConfigFile;
+        };
         defer memory.default_allocator.free(content);
 
-        var parsed = try std.json.parseFromSlice(Config, memory.default_allocator, content, .{});
+        var parsed = std.json.parseFromSlice(Config, memory.default_allocator, content, .{}) catch |err| {
+            log.err("Failed to parse config from \"{s}\" file: {}", .{ path, err });
+            return error.FailedToParseConfigFile;
+        };
         defer parsed.deinit();
 
+        log.info("Loaded config from \"{s}\" file", .{path});
         return parsed.value;
     }
 };

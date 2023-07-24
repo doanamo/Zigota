@@ -103,8 +103,6 @@ pub const PipelineBuilder = struct {
     }
 
     pub fn build(self: *PipelineBuilder) !Pipeline {
-        log.info("Creating pipeline...", .{});
-
         var shader_stage_create_infos = try memory.default_allocator.alloc(c.VkPipelineShaderStageCreateInfo, self.shader_stages.items.len);
         defer memory.default_allocator.free(shader_stage_create_infos);
 
@@ -275,7 +273,12 @@ pub const PipelineBuilder = struct {
         };
 
         var pipeline: c.VkPipeline = undefined;
-        try check(c.vkCreateGraphicsPipelines.?(self.device.handle, null, 1, &pipeline_create_info, memory.vulkan_allocator, &pipeline));
+        check(c.vkCreateGraphicsPipelines.?(self.device.handle, null, 1, &pipeline_create_info, memory.vulkan_allocator, &pipeline)) catch |err| {
+            log.err("Failed to create graphics pipeline: {}", .{err});
+            return error.FailedToCreateGraphicsPipeline;
+        };
+
+        log.info("Created graphics pipeline", .{});
 
         return .{
             .handle = pipeline,

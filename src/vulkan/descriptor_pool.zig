@@ -32,8 +32,8 @@ pub const DescriptorPool = struct {
             },
         };
 
-        check(c.vkCreateDescriptorPool.?(self.device.handle, &pool_create_info, memory.vulkan_allocator, &self.handle)) catch {
-            log.err("Failed to create descriptor pool", .{});
+        check(c.vkCreateDescriptorPool.?(self.device.handle, &pool_create_info, memory.vulkan_allocator, &self.handle)) catch |err| {
+            log.err("Failed to create descriptor pool: {}", .{err});
             return error.FailedToCreateDescriptorPool;
         };
 

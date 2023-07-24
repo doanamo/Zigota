@@ -16,8 +16,8 @@ pub const PhysicalDevice = struct {
         var self = PhysicalDevice{};
         errdefer self.deinit();
 
-        self.selectPhysicalDevice(instance) catch {
-            log.err("Failed to select physical device", .{});
+        self.selectPhysicalDevice(instance) catch |err| {
+            log.err("Failed to select physical device: {}", .{err});
             return error.FailedToSelectPhysicalDevice;
         };
 

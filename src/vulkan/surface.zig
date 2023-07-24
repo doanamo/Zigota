@@ -23,8 +23,8 @@ pub const Surface = struct {
         self.instance = instance;
         self.physical_device = physical_device;
 
-        self.createWindowSurface(window, instance) catch {
-            log.err("Failed to create window surface", .{});
+        self.createWindowSurface(window, instance) catch |err| {
+            log.err("Failed to create window surface: {}", .{err});
             return error.FailedToCreatenWindowSurface;
         };
 

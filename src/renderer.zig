@@ -40,38 +40,38 @@ pub const Renderer = struct {
         var self = Renderer{};
         errdefer self.deinit();
 
-        self.vulkan = Vulkan.init(window) catch {
-            log.err("Failed to initialize Vulkan", .{});
+        self.vulkan = Vulkan.init(window) catch |err| {
+            log.err("Failed to initialize Vulkan: {}", .{err});
             return error.FailedToInitializeVulkan;
         };
 
-        self.createCommandBuffers() catch {
-            log.err("Failed to create command buffers", .{});
+        self.createCommandBuffers() catch |err| {
+            log.err("Failed to create command buffers: {}", .{err});
             return error.FailedToCreateCommandBuffers;
         };
 
-        self.createBuffers() catch {
-            log.err("Failed to create buffers", .{});
+        self.createBuffers() catch |err| {
+            log.err("Failed to create buffers: {}", .{err});
             return error.FailedToCreateBuffers;
         };
 
-        self.createMesh() catch {
-            log.err("Failed to create mesh", .{});
+        self.createMesh() catch |err| {
+            log.err("Failed to create mesh: {}", .{err});
             return error.FailedToCreateMesh;
         };
 
-        self.createLayouts() catch {
-            log.err("Failed to create layouts", .{});
+        self.createLayouts() catch |err| {
+            log.err("Failed to create layouts: {}", .{err});
             return error.FailedToCreateLayouts;
         };
 
-        self.createDescriptors() catch {
-            log.err("Failed to create descriptors", .{});
+        self.createDescriptors() catch |err| {
+            log.err("Failed to create descriptors: {}", .{err});
             return error.FailedToCreateDescriptors;
         };
 
-        self.createPipeline() catch {
-            log.err("Failed to create pipeline", .{});
+        self.createPipeline() catch |err| {
+            log.err("Failed to create pipeline: {}", .{err});
             return error.FailedToCreatePipeline;
         };
 
@@ -414,7 +414,7 @@ pub const Renderer = struct {
         var vertex_offsets = [_]c.VkDeviceSize{undefined} ** vertex_attributes.max_attributes;
         self.mesh.fillVertexBufferOffsets(&vertex_offsets);
 
-        c.vkCmdBindVertexBuffers.?(command_buffer.handle, 0, self.mesh.getVertexAttributeCount(), &vertex_buffers, &vertex_offsets);
+        c.vkCmdBindVertexBuffers.?(command_buffer.handle, 0, self.mesh.getAttributeCount(), &vertex_buffers, &vertex_offsets);
         c.vkCmdBindIndexBuffer.?(command_buffer.handle, self.mesh.index_buffer.handle, 0, self.mesh.getIndexFormat());
         c.vkCmdDrawIndexed.?(command_buffer.handle, self.mesh.getIndexCount(), 1, 0, 0, 0);
 

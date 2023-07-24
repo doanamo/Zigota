@@ -47,18 +47,18 @@ pub const Transfer = struct {
         self.device = device;
         self.vma = vma;
 
-        self.createCommandPool() catch {
-            log.err("Failed to create transfer command pool", .{});
+        self.createCommandPool() catch |err| {
+            log.err("Failed to create transfer command pool: {}", .{err});
             return error.FailedToCreateCommandPool;
         };
 
-        self.createStagingBuffer() catch {
-            log.err("Failed to create transfer staging buffer", .{});
+        self.createStagingBuffer() catch |err| {
+            log.err("Failed to create transfer staging buffer: {}", .{err});
             return error.FailedToCreateStagingBuffers;
         };
 
-        self.createSynchronization() catch {
-            log.err("Failed to create transfer synchronization", .{});
+        self.createSynchronization() catch |err| {
+            log.err("Failed to create transfer synchronization: {}", .{err});
             return error.FailedToCreateSynchronization;
         };
 

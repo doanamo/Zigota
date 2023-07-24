@@ -7,7 +7,7 @@ pub fn init() !void {
     errdefer deinit();
 
     if (c.glfwInit() == c.GLFW_FALSE) {
-        log.err("Failed to initialize library", .{});
+        log.err("Failed to initialize GLFW library", .{});
         return error.FailedToInitializeGLFWLibrary;
     }
 
@@ -17,7 +17,7 @@ pub fn init() !void {
     var glfwVersionMinor: c_int = undefined;
     var glfwVersionPatch: c_int = undefined;
     c.glfwGetVersion(&glfwVersionMajor, &glfwVersionMinor, &glfwVersionPatch);
-    log.info("Initialized version {}.{}.{}", .{
+    log.info("Initialized GLFW version {}.{}.{}", .{
         glfwVersionMajor, glfwVersionMinor, glfwVersionPatch,
     });
 }

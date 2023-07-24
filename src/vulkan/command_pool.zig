@@ -28,8 +28,8 @@ pub const CommandPool = struct {
             .queueFamilyIndex = device.getQueue(params.queue).index,
         };
 
-        check(c.vkCreateCommandPool.?(device.handle, &create_info, memory.vulkan_allocator, &self.handle)) catch {
-            log.err("Failed to create command pool", .{});
+        check(c.vkCreateCommandPool.?(device.handle, &create_info, memory.vulkan_allocator, &self.handle)) catch |err| {
+            log.err("Failed to create command pool: {}", .{err});
             return error.FailedToCreateCommandPool;
         };
 

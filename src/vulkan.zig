@@ -41,38 +41,38 @@ pub const Vulkan = struct {
         var heap = self.heap orelse unreachable;
         heap.* = .{};
 
-        heap.instance = Instance.init() catch {
-            log.err("Failed to initialize instance", .{});
+        heap.instance = Instance.init() catch |err| {
+            log.err("Failed to initialize instance: {}", .{err});
             return error.FailedToInitializeInstance;
         };
 
-        heap.physical_device = PhysicalDevice.init(&heap.instance) catch {
-            log.err("Failed to initialize physical device", .{});
+        heap.physical_device = PhysicalDevice.init(&heap.instance) catch |err| {
+            log.err("Failed to initialize physical device: {}", .{err});
             return error.FailedToInitializePhysicalDevice;
         };
 
-        heap.surface = Surface.init(window, &heap.instance, &heap.physical_device) catch {
-            log.err("Failed to initialize surface", .{});
+        heap.surface = Surface.init(window, &heap.instance, &heap.physical_device) catch |err| {
+            log.err("Failed to initialize surface: {}", .{err});
             return error.FailedToInitializeSurface;
         };
 
-        heap.device = Device.init(&heap.physical_device, &heap.surface) catch {
-            log.err("Failed to initialize device", .{});
+        heap.device = Device.init(&heap.physical_device, &heap.surface) catch |err| {
+            log.err("Failed to initialize device: {}", .{err});
             return error.FailedToInitializeDevice;
         };
 
-        heap.vma = VmaAllocator.init(&heap.instance, &heap.physical_device, &heap.device) catch {
-            log.err("Failed to initialize allocator", .{});
+        heap.vma = VmaAllocator.init(&heap.instance, &heap.physical_device, &heap.device) catch |err| {
+            log.err("Failed to initialize allocator: {}", .{err});
             return error.FailedToInitializeAllocator;
         };
 
-        heap.swapchain = Swapchain.init(window, &heap.surface, &heap.device, &heap.vma) catch {
-            log.err("Failed to initialize swapchain", .{});
+        heap.swapchain = Swapchain.init(window, &heap.surface, &heap.device, &heap.vma) catch |err| {
+            log.err("Failed to initialize swapchain: {}", .{err});
             return error.FailedToInitializeSwapchain;
         };
 
-        heap.transfer = Transfer.init(&heap.device, &heap.vma) catch {
-            log.err("Failed to initialize transfer", .{});
+        heap.transfer = Transfer.init(&heap.device, &heap.vma) catch |err| {
+            log.err("Failed to initialize transfer: {}", .{err});
             return error.FailedToInitializeTransfer;
         };
 

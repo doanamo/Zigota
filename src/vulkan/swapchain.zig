@@ -56,23 +56,23 @@ pub const Swapchain = struct {
         self.device = device;
         self.vma = vma;
 
-        self.createSwapchain() catch {
-            log.err("Failed to create swapchain", .{});
+        self.createSwapchain() catch |err| {
+            log.err("Failed to create swapchain: {}", .{err});
             return error.FailedToCreateSwapchain;
         };
 
-        self.createImageViews(false) catch {
-            log.err("Failed to create image views", .{});
+        self.createImageViews(false) catch |err| {
+            log.err("Failed to create image views: {}", .{err});
             return error.FailedToCreateImageViews;
         };
 
-        self.createDepthStencilBuffer(false) catch {
-            log.err("Failed to create depth stencil buffer", .{});
+        self.createDepthStencilBuffer(false) catch |err| {
+            log.err("Failed to create depth stencil buffer: {}", .{err});
             return error.FailedToCreateDepthStencilBuffer;
         };
 
-        self.createImageSynchronization() catch {
-            log.err("Failed to create image synchronization", .{});
+        self.createImageSynchronization() catch |err| {
+            log.err("Failed to create image synchronization: {}", .{err});
             return error.FailedToCreateImageSynchronization;
         };
 

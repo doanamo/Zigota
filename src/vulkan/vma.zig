@@ -61,7 +61,10 @@ pub const VmaAllocator = struct {
             .pTypeExternalMemoryHandleTypes = null,
         };
 
-        try check(c.vmaCreateAllocator(&allocator_create_info, &self.handle));
+        check(c.vmaCreateAllocator(&allocator_create_info, &self.handle)) catch |err| {
+            log.err("Failed to create memory allocator: {}", .{err});
+            return error.FailedToCreateMemoryAllocator;
+        };
 
         return self;
     }

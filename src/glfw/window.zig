@@ -33,13 +33,13 @@ pub const Window = struct {
         self.heap = try memory.default_allocator.create(Heap);
         self.heap.?.* = .{};
 
-        self.createTitleBuffer(title) catch {
-            log.err("Failed to create title buffer", .{});
+        self.createTitleBuffer(title) catch |err| {
+            log.err("Failed to create title buffer: {}", .{err});
             return error.FailedToCreateTitleBuffer;
         };
 
-        self.createWindow() catch {
-            log.err("Failed to create window", .{});
+        self.createWindow() catch |err| {
+            log.err("Failed to create window: {}", .{err});
             return error.FailedToCreateWindow;
         };
 
