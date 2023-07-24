@@ -13,38 +13,59 @@ pub const Window = struct {
         resizable: bool,
     };
 
-    handle: ?*c.GLFWwindow = null,
-    width: u32 = undefined,
-    height: u32 = undefined,
-    resized: bool = false,
-    minimized: bool = false,
+    // Heap allocated memory for window callbacks
+    pub const Heap = struct {
+        width: u32 = undefined,
+        height: u32 = undefined,
+        resized: bool = false,
+        minimized: bool = false,
+    };
 
-    title_initial: [:0]const u8 = undefined,
+    heap: ?*Heap = null,
     title_buffer: []u8 = &[_]u8{},
+    title_initial: [:0]const u8 = undefined,
+    handle: ?*c.GLFWwindow = null,
 
-    pub fn init(self: *Window, title: [:0]const u8) !void {
+    pub fn init(title: [:0]const u8) !Window {
+        var self = Window{};
         errdefer self.deinit();
 
-        self.title_initial = title;
-        self.title_buffer = try memory.default_allocator.alloc(u8, 256);
+        self.heap = try memory.default_allocator.create(Heap);
+        self.heap.?.* = .{};
+
+        self.createTitleBuffer(title) catch {
+            log.err("Failed to create title buffer", .{});
+            return error.FailedToCreateTitleBuffer;
+        };
 
         self.createWindow() catch {
             log.err("Failed to create window", .{});
             return error.FailedToCreateWindow;
         };
+
+        return self;
     }
 
     pub fn deinit(self: *Window) void {
-        if (self.handle != null) {
-            c.glfwDestroyWindow(self.handle);
-        }
+        self.destroyWindow();
+        self.destroyTitleBuffer();
 
-        memory.default_allocator.free(self.title_buffer);
+        if (self.heap) |heap| {
+            memory.default_allocator.destroy(heap);
+        }
         self.* = undefined;
     }
 
+    fn createTitleBuffer(self: *Window, title: [:0]const u8) !void {
+        self.title_buffer = try memory.default_allocator.alloc(u8, 256);
+        self.title_initial = title;
+    }
+
+    fn destroyTitleBuffer(self: *Window) void {
+        memory.default_allocator.free(self.title_buffer);
+    }
+
     fn createWindow(self: *Window) !void {
-        log.info("Creating window...", .{});
         const config = root.config.window;
 
         c.glfwWindowHint(c.GLFW_CLIENT_API, c.GLFW_NO_API);
@@ -58,31 +79,41 @@ pub const Window = struct {
 
         try self.updateTitle(0.0, 0.0);
 
-        c.glfwSetWindowUserPointer(self.handle, self);
+        c.glfwSetWindowUserPointer(self.handle, self.heap);
         _ = c.glfwSetFramebufferSizeCallback(self.handle, framebufferSizeCallback);
 
         var width: c_int = undefined;
         var height: c_int = undefined;
         c.glfwGetFramebufferSize(self.handle, &width, &height);
 
-        self.width = @intCast(width);
-        self.height = @intCast(height);
-        log.info("Created {}x{} window", .{ self.width, self.height });
+        self.heap.?.width = @intCast(width);
+        self.heap.?.height = @intCast(height);
+        log.info("Created {}x{} window", .{ width, height });
+    }
+
+    fn destroyWindow(self: *Window) void {
+        if (self.handle != null) {
+            c.glfwDestroyWindow(self.handle);
+        }
     }
 
     pub fn show(self: *Window) void {
+        std.debug.assert(self.handle != null);
         c.glfwShowWindow(self.handle);
     }
 
     pub fn hide(self: *Window) void {
+        std.debug.assert(self.handle != null);
         c.glfwHideWindow(self.handle);
     }
 
     pub fn setTitle(self: *Window, title: [:0]const u8) void {
+        std.debug.assert(self.handle != null);
         c.glfwSetWindowTitle(self.handle, title.ptr);
     }
 
     pub fn shouldClose(self: *const Window) bool {
+        std.debug.assert(self.handle != null);
         return c.glfwWindowShouldClose(self.handle) == c.GLFW_TRUE;
     }
 
@@ -101,17 +132,35 @@ pub const Window = struct {
             utility.toMegabytes(committed_memory),
         }));
     }
-};
 
-fn framebufferSizeCallback(window: ?*c.GLFWwindow, width: c_int, height: c_int) callconv(.C) void {
-    var self: *Window = @ptrCast(@alignCast(c.glfwGetWindowUserPointer(window)));
-
-    if (width > 0 and height > 0) {
-        self.width = @intCast(width);
-        self.height = @intCast(height);
-        self.resized = !self.minimized;
-        self.minimized = false;
-    } else {
-        self.minimized = true;
+    pub fn getWidth(self: *const Window) u32 {
+        return self.heap.?.width;
     }
-}
+
+    pub fn getHeight(self: *const Window) u32 {
+        return self.heap.?.height;
+    }
+
+    pub fn isMinimized(self: *const Window) bool {
+        return self.heap.?.minimized;
+    }
+
+    pub fn handleResize(self: *Window) bool {
+        const resized = self.heap.?.resized;
+        self.heap.?.resized = false;
+        return resized;
+    }
+
+    fn framebufferSizeCallback(window: ?*c.GLFWwindow, width: c_int, height: c_int) callconv(.C) void {
+        var heap = @as(?*Heap, @ptrCast(@alignCast(c.glfwGetWindowUserPointer(window)))) orelse unreachable;
+
+        if (width > 0 and height > 0) {
+            heap.width = @intCast(width);
+            heap.height = @intCast(height);
+            heap.resized = !heap.minimized;
+            heap.minimized = false;
+        } else {
+            heap.minimized = true;
+        }
+    }
+};

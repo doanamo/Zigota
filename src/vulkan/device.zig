@@ -28,7 +28,8 @@ pub const Device = struct {
     handle: c.VkDevice = null,
     queues: [queue_type_count]Queue = undefined,
 
-    pub fn init(self: *Device, physical_device: *const PhysicalDevice, surface: *Surface) !void {
+    pub fn init(physical_device: *const PhysicalDevice, surface: *Surface) !Device {
+        var self = Device{};
         errdefer self.deinit();
 
         self.selectQueueFamilies(physical_device, surface) catch {
@@ -40,6 +41,8 @@ pub const Device = struct {
             log.err("Failed to create logical device", .{});
             return error.FailedToCreateLogicalDevice;
         };
+
+        return self;
     }
 
     pub fn deinit(self: *Device) void {
@@ -214,6 +217,7 @@ pub const Device = struct {
     }
 
     pub fn waitIdle(self: *Device) void {
+        std.debug.assert(self.handle != null);
         check(c.vkDeviceWaitIdle.?(self.handle)) catch unreachable;
     }
 

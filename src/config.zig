@@ -10,7 +10,7 @@ pub const Config = struct {
     window: WindowConfig = undefined,
     vulkan: VulkanConfig = undefined,
 
-    pub fn init(self: *Config) !void {
+    pub fn init() !Config {
         log.info("Loading config from file...", .{});
 
         const content = try std.fs.cwd().readFileAllocOptions(
@@ -26,6 +26,6 @@ pub const Config = struct {
         var parsed = try std.json.parseFromSlice(Config, memory.default_allocator, content, .{});
         defer parsed.deinit();
 
-        self.* = parsed.value;
+        return parsed.value;
     }
 };

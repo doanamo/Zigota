@@ -8,15 +8,17 @@ const check = utility.vulkanCheckResult;
 const Device = @import("device.zig").Device;
 
 pub const DescriptorPool = struct {
-    device: *Device = undefined,
     handle: c.VkDescriptorPool = null,
+    device: *Device = undefined,
 
-    pub fn init(self: *DescriptorPool, device: *Device, params: struct {
+    pub fn init(device: *Device, params: struct {
         max_set_count: u32,
         uniform_buffer_count: u32,
-    }) !void {
-        self.device = device;
+    }) !DescriptorPool {
+        var self = DescriptorPool{};
         errdefer self.deinit();
+
+        self.device = device;
 
         const pool_create_info = c.VkDescriptorPoolCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -34,6 +36,8 @@ pub const DescriptorPool = struct {
             log.err("Failed to create descriptor pool", .{});
             return error.FailedToCreateDescriptorPool;
         };
+
+        return self;
     }
 
     pub fn deinit(self: *DescriptorPool) void {

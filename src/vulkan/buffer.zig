@@ -8,22 +8,24 @@ const check = utility.vulkanCheckResult;
 const VmaAllocator = @import("vma.zig").VmaAllocator;
 
 pub const Buffer = struct {
-    vma: *VmaAllocator = undefined,
     handle: c.VkBuffer = null,
     allocation: c.VmaAllocation = undefined,
+    vma: *VmaAllocator = undefined,
     size: usize = 0,
 
-    pub fn init(self: *Buffer, vma: *VmaAllocator, params: struct {
+    pub fn init(vma: *VmaAllocator, params: struct {
         size: usize,
         usage_flags: c.VkBufferUsageFlags,
         sharing_mode: c.VkSharingMode = c.VK_SHARING_MODE_EXCLUSIVE,
         memory_usage: c.VmaMemoryUsage = c.VMA_MEMORY_USAGE_AUTO,
         memory_flags: c.VmaPoolCreateFlags = 0,
         memory_priority: f32 = 0.0,
-    }) !void {
+    }) !Buffer {
+        var self = Buffer{};
+        errdefer self.deinit();
+
         self.vma = vma;
         self.size = params.size;
-        errdefer self.deinit();
 
         const buffer_create_info = c.VkBufferCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -48,9 +50,13 @@ pub const Buffer = struct {
         };
 
         var allocation_info: c.VmaAllocationInfo = undefined;
-        try check(c.vmaCreateBuffer(vma.handle, &buffer_create_info, &allocation_create_info, &self.handle, &self.allocation, &allocation_info));
+        check(c.vmaCreateBuffer(vma.handle, &buffer_create_info, &allocation_create_info, &self.handle, &self.allocation, &allocation_info)) catch {
+            log.err("Failed to create buffer (size {} bytes)", .{params.size});
+            return error.FailedToCreateBuffer;
+        };
 
         log.info("Created buffer (size {} bytes)", .{params.size});
+        return self;
     }
 
     pub fn deinit(self: *Buffer) void {
@@ -61,12 +67,17 @@ pub const Buffer = struct {
     }
 
     pub fn map(self: *Buffer) ![]u8 {
+        std.debug.assert(self.vma.handle != null);
+        std.debug.assert(self.allocation != null);
+
         var data: ?*anyopaque = undefined;
         try check(c.vmaMapMemory(self.vma.handle, self.allocation, &data));
         return @as([*]u8, @ptrCast(@alignCast(data)))[0..self.size];
     }
 
     pub fn unmap(self: *Buffer) void {
+        std.debug.assert(self.vma.handle != null);
+        std.debug.assert(self.allocation != null);
         c.vmaUnmapMemory(self.vma.handle, self.allocation);
     }
 
@@ -74,10 +85,13 @@ pub const Buffer = struct {
         const mapped_data = try self.map();
         defer self.unmap();
 
+        std.debug.assert(offset + data.len <= self.size);
         @memcpy(mapped_data[offset .. offset + data.len], data);
     }
 
     pub fn flush(self: *Buffer, offset: usize, size: usize) !void {
+        std.debug.assert(self.vma.handle != null);
+        std.debug.assert(self.allocation != null);
         try check(c.vmaFlushAllocation(self.vma.handle, self.allocation, offset, size));
     }
 };

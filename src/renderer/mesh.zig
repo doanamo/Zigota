@@ -5,7 +5,7 @@ const utility = @import("../utility.zig");
 const vertex_attributes = @import("../vulkan/vertex_attributes.zig");
 const log = std.log.scoped(.Renderer);
 
-const Vulkan = @import("../vulkan.zig").Vulkan;
+const Transfer = @import("../vulkan/transfer.zig").Transfer;
 const Buffer = @import("../vulkan/buffer.zig").Buffer;
 const VertexAttributeType = vertex_attributes.VertexAttributeType;
 const VertexAttributeFlags = vertex_attributes.VertexAttributeFlags;
@@ -49,8 +49,10 @@ pub const Mesh = struct {
     index_buffer: Buffer = .{},
     index_type_bytes: u8 = undefined,
 
-    pub fn loadFromFile(self: *Mesh, vulkan: *Vulkan, path: []const u8) !void {
+    pub fn init(transfer: *Transfer, path: []const u8) !Mesh {
         log.info("Loading mesh from \"{s}\" file...", .{path});
+
+        var self = Mesh{};
         errdefer self.deinit();
 
         var file = try std.fs.cwd().openFile(path, .{ .mode = .read_only });
@@ -71,7 +73,7 @@ pub const Mesh = struct {
             return error.InvalidVerticesHeader;
         } else {
             var current_attribute_offset: usize = 0;
-            try self.vertex_buffer.init(&vulkan.vma, .{
+            self.vertex_buffer = try Buffer.init(transfer.vma, .{
                 .size = vertices_header.vertex_count * vertices_header.attribute_types.getCombinedSize(),
                 .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT | c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
             });
@@ -86,7 +88,7 @@ pub const Mesh = struct {
                 defer memory.frame_allocator.free(attribute_data);
 
                 try reader.readNoEof(attribute_data);
-                try vulkan.transfer.upload(&self.vertex_buffer, current_attribute_offset, attribute_data);
+                try transfer.upload(&self.vertex_buffer, current_attribute_offset, attribute_data);
 
                 try self.attribute_offsets.append(memory.default_allocator, current_attribute_offset);
                 current_attribute_offset += attribute_data_size;
@@ -99,8 +101,7 @@ pub const Mesh = struct {
             return error.InvalidIndicesHeader;
         } else {
             self.index_type_bytes = @intCast(indices_header.index_type_bytes);
-
-            try self.index_buffer.init(&vulkan.vma, .{
+            self.index_buffer = try Buffer.init(transfer.vma, .{
                 .size = indices_header.index_count * indices_header.index_type_bytes,
                 .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT | c.VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
             });
@@ -109,12 +110,14 @@ pub const Mesh = struct {
             defer memory.frame_allocator.free(index_data);
 
             try reader.readNoEof(index_data);
-            try vulkan.transfer.upload(&self.index_buffer, 0, index_data);
+            try transfer.upload(&self.index_buffer, 0, index_data);
         }
 
         if (reader.readBytesNoEof(4) != error.EndOfStream) {
             return error.UnexpectedFileData;
         }
+
+        return self;
     }
 
     pub fn deinit(self: *Mesh) void {
@@ -134,6 +137,7 @@ pub const Mesh = struct {
     }
 
     pub fn getIndexFormat(self: *Mesh) c.VkIndexType {
+        std.debug.assert(self.index_type_bytes != 0);
         switch (self.index_type_bytes) {
             2 => return c.VK_INDEX_TYPE_UINT16,
             4 => return c.VK_INDEX_TYPE_UINT32,
@@ -141,20 +145,18 @@ pub const Mesh = struct {
         }
     }
 
-    pub fn fillVertexBufferHandles(self: *Mesh, array: []c.VkBuffer) !void {
-        if (self.attribute_offsets.items.len > array.len) {
-            return error.InsufficientArraySize;
-        }
+    pub fn fillVertexBufferHandles(self: *Mesh, array: []c.VkBuffer) void {
+        std.debug.assert(self.attribute_offsets.items.len != 0);
+        std.debug.assert(self.attribute_offsets.items.len <= array.len);
 
         for (0..self.attribute_offsets.items.len) |index| {
             array[index] = self.vertex_buffer.handle;
         }
     }
 
-    pub fn fillVertexBufferOffsets(self: *Mesh, array: []c.VkDeviceSize) !void {
-        if (self.attribute_offsets.items.len > array.len) {
-            return error.InsufficientArraySize;
-        }
+    pub fn fillVertexBufferOffsets(self: *Mesh, array: []c.VkDeviceSize) void {
+        std.debug.assert(self.attribute_offsets.items.len != 0);
+        std.debug.assert(self.attribute_offsets.items.len <= array.len);
 
         for (0..self.attribute_offsets.items.len) |index| {
             array[index] = self.attribute_offsets.items[index];

@@ -12,7 +12,7 @@ pub const Image = struct {
     allocation: c.VmaAllocation = undefined,
     vma: *VmaAllocator = undefined,
 
-    pub fn init(self: *Image, vma: *VmaAllocator, params: struct {
+    pub fn init(vma: *VmaAllocator, params: struct {
         format: c.VkFormat,
         extent: c.VkExtent3D,
         usage_flags: c.VkImageUsageFlags,
@@ -23,9 +23,11 @@ pub const Image = struct {
         memory_usage: c.VmaMemoryUsage = c.VMA_MEMORY_USAGE_AUTO,
         memory_flags: c.VmaPoolCreateFlags = 0,
         memory_priority: f32 = 0.0,
-    }) !void {
-        self.vma = vma;
+    }) !Image {
+        var self = Image{};
         errdefer self.deinit();
+
+        self.vma = vma;
 
         const image_create_info = c.VkImageCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -57,7 +59,12 @@ pub const Image = struct {
         };
 
         var allocation_info: c.VmaAllocationInfo = undefined;
-        try check(c.vmaCreateImage(vma.handle, &image_create_info, &allocation_create_info, &self.handle, &self.allocation, &allocation_info));
+        check(c.vmaCreateImage(vma.handle, &image_create_info, &allocation_create_info, &self.handle, &self.allocation, &allocation_info)) catch {
+            log.err("Failed to create image", .{});
+            return error.FailedToCreateImage;
+        };
+
+        return self;
     }
 
     pub fn deinit(self: *Image) void {

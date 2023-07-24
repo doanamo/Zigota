@@ -16,15 +16,19 @@ pub const Surface = struct {
     capabilities: c.VkSurfaceCapabilitiesKHR = undefined,
     present_modes: []c.VkPresentModeKHR = &.{},
 
-    pub fn init(self: *Surface, window: *Window, instance: *Instance, physical_device: *const PhysicalDevice) !void {
+    pub fn init(window: *Window, instance: *Instance, physical_device: *const PhysicalDevice) !Surface {
+        var self = Surface{};
+        errdefer self.deinit();
+
         self.instance = instance;
         self.physical_device = physical_device;
-        errdefer self.deinit();
 
         self.createWindowSurface(window, instance) catch {
             log.err("Failed to create window surface", .{});
             return error.FailedToCreatenWindowSurface;
         };
+
+        return self;
     }
 
     pub fn deinit(self: *Surface) void {
@@ -57,6 +61,8 @@ pub const Surface = struct {
     pub fn updateCapabilities(self: *Surface) !void {
         // This is exposed because it needs to be called at least once
         // after resizing window to avoid Vulkan validation layer errors
+        std.debug.assert(self.handle != null);
+        std.debug.assert(self.physical_device.handle != null);
         try check(c.vkGetPhysicalDeviceSurfaceCapabilitiesKHR.?(self.physical_device.handle, self.handle, &self.capabilities));
     }
 };

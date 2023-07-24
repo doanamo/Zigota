@@ -12,12 +12,14 @@ pub const CommandPool = struct {
     handle: c.VkCommandPool = null,
     device: *Device = undefined,
 
-    pub fn init(self: *CommandPool, device: *Device, params: struct {
+    pub fn init(device: *Device, params: struct {
         queue: Device.QueueType,
         flags: c.VkCommandPoolCreateFlags = 0,
-    }) !void {
-        self.device = device;
+    }) !CommandPool {
+        var self = CommandPool{};
         errdefer self.deinit();
+
+        self.device = device;
 
         const create_info = c.VkCommandPoolCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -30,6 +32,8 @@ pub const CommandPool = struct {
             log.err("Failed to create command pool", .{});
             return error.FailedToCreateCommandPool;
         };
+
+        return self;
     }
 
     pub fn deinit(self: *CommandPool) void {
@@ -40,9 +44,10 @@ pub const CommandPool = struct {
     }
 
     pub fn createBuffer(self: *CommandPool, level: c.VkCommandBufferLevel) !CommandBuffer {
-        var command_buffer = CommandBuffer{};
-        try command_buffer.init(self.device, self, level);
-        return command_buffer;
+        return try CommandBuffer.init(self.device, .{
+            .command_pool = self,
+            .level = level,
+        });
     }
 
     pub fn reset(self: *CommandPool) !void {

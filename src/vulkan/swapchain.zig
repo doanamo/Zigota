@@ -47,12 +47,14 @@ pub const Swapchain = struct {
     frame_inflight_fences: std.ArrayListUnmanaged(c.VkFence) = .{},
     frame_index: u32 = 0,
 
-    pub fn init(self: *Swapchain, window: *Window, surface: *Surface, device: *Device, vma: *VmaAllocator) !void {
+    pub fn init(window: *Window, surface: *Surface, device: *Device, vma: *VmaAllocator) !Swapchain {
+        var self = Swapchain{};
+        errdefer self.deinit();
+
         self.window = window;
         self.surface = surface;
         self.device = device;
         self.vma = vma;
-        errdefer self.deinit();
 
         self.createSwapchain() catch {
             log.err("Failed to create swapchain", .{});
@@ -73,6 +75,8 @@ pub const Swapchain = struct {
             log.err("Failed to create image synchronization", .{});
             return error.FailedToCreateImageSynchronization;
         };
+
+        return self;
     }
 
     pub fn deinit(self: *Swapchain) void {
@@ -92,8 +96,8 @@ pub const Swapchain = struct {
         const config = root.config.vulkan.swapchain;
 
         self.extent = c.VkExtent2D{
-            .width = self.window.width,
-            .height = self.window.height,
+            .width = self.window.getWidth(),
+            .height = self.window.getHeight(),
         };
 
         self.image_format = c.VK_FORMAT_B8G8R8A8_UNORM;
@@ -200,8 +204,7 @@ pub const Swapchain = struct {
         errdefer self.destroyDepthStencilBuffer(recreating);
 
         self.depth_stencil_image_format = c.VK_FORMAT_D32_SFLOAT_S8_UINT;
-
-        try self.depth_stencil_image.init(self.vma, .{
+        self.depth_stencil_image = try Image.init(self.vma, .{
             .format = self.depth_stencil_image_format,
             .extent = .{
                 .width = self.extent.width,
@@ -304,6 +307,8 @@ pub const Swapchain = struct {
 
     pub fn recreate(self: *Swapchain) !void {
         log.info("Recreating swapchain...", .{});
+        std.debug.assert(self.handle != null);
+
         try self.surface.updateCapabilities();
 
         self.destroyDepthStencilBuffer(true);
@@ -321,6 +326,9 @@ pub const Swapchain = struct {
         finished_semaphore: c.VkSemaphore,
         inflight_fence: c.VkFence,
     } {
+        std.debug.assert(self.handle != null);
+        std.debug.assert(self.device.handle != null);
+
         try check(c.vkWaitForFences.?(self.device.handle, 1, &self.frame_inflight_fences.items[self.frame_index], c.VK_TRUE, std.math.maxInt(u64)));
 
         var image_index: u32 = 0;
@@ -349,6 +357,8 @@ pub const Swapchain = struct {
     }
 
     pub fn recordLayoutTransitions(self: *Swapchain, command_buffer: *CommandBuffer, image_index: u32) void {
+        std.debug.assert(self.handle != null);
+
         const color_attachment_layout_transition = c.VkImageMemoryBarrier2{
             .sType = c.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
             .pNext = null,
@@ -410,6 +420,9 @@ pub const Swapchain = struct {
     }
 
     pub fn present(self: *Swapchain, present_info: *const c.VkPresentInfoKHR) !void {
+        std.debug.assert(self.handle != null);
+        std.debug.assert(self.device.handle != null);
+
         const result = c.vkQueuePresentKHR.?(self.device.getQueue(.Graphics).handle, present_info);
 
         switch (result) {

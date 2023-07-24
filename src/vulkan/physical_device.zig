@@ -12,13 +12,16 @@ pub const PhysicalDevice = struct {
     properties: c.VkPhysicalDeviceProperties = undefined,
     features: c.VkPhysicalDeviceFeatures = undefined,
 
-    pub fn init(self: *PhysicalDevice, instance: *Instance) !void {
+    pub fn init(instance: *Instance) !PhysicalDevice {
+        var self = PhysicalDevice{};
         errdefer self.deinit();
 
         self.selectPhysicalDevice(instance) catch {
             log.err("Failed to select physical device", .{});
             return error.FailedToSelectPhysicalDevice;
         };
+
+        return self;
     }
 
     pub fn deinit(self: *PhysicalDevice) void {

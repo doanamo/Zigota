@@ -10,14 +10,18 @@ const CommandPool = @import("command_pool.zig").CommandPool;
 pub const CommandBuffer = struct {
     handle: c.VkCommandBuffer = null,
 
-    pub fn init(self: *CommandBuffer, device: *Device, command_pool: *CommandPool, level: c.VkCommandBufferLevel) !void {
-        errdefer self.deinit(device, command_pool);
+    pub fn init(device: *Device, params: struct {
+        command_pool: *CommandPool,
+        level: c.VkCommandBufferLevel,
+    }) !CommandBuffer {
+        var self = CommandBuffer{};
+        errdefer self.deinit(device, params.command_pool);
 
         const allocate_info = c.VkCommandBufferAllocateInfo{
             .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
             .pNext = null,
-            .commandPool = command_pool.handle,
-            .level = level,
+            .commandPool = params.command_pool.handle,
+            .level = params.level,
             .commandBufferCount = 1,
         };
 
@@ -25,6 +29,8 @@ pub const CommandBuffer = struct {
             log.err("Failed to create command buffer", .{});
             return error.FailedToCreateCommandBuffer;
         };
+
+        return self;
     }
 
     pub fn deinit(self: *CommandBuffer, device: *Device, command_pool: *CommandPool) void {

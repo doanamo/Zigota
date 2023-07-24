@@ -24,24 +24,25 @@ pub fn main() !void {
     try memory.init();
     defer memory.deinit();
 
-    // Load config
-    try config.init();
-
     // Initialize GLFW
     try glfw.init();
     defer glfw.deinit();
 
+    // Load config
+    config = try Config.init();
+
     // Create application
-    var application = Application{};
-    try application.init();
+    var application = try Application.init();
     defer application.deinit();
+
+    var window = &application.heap.?.window;
 
     // Main loop
     log.info("Starting main loop...", .{});
-    application.window.show();
+    window.show();
 
     var timer = try std.time.Timer.start();
-    while (!application.window.shouldClose()) {
+    while (!window.shouldClose()) {
         glfw.pollEvents();
 
         const time_delta: f32 = @floatCast(@as(f64, @floatFromInt(timer.lap())) / @as(f64, @floatFromInt(std.time.ns_per_s)));

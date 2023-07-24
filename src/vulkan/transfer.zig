@@ -38,11 +38,14 @@ pub const Transfer = struct {
     finished_semaphore: c.VkSemaphore = null,
     finished_semaphore_index: u64 = 0,
 
-    pub fn init(self: *Transfer, device: *Device, vma: *VmaAllocator) !void {
+    pub fn init(device: *Device, vma: *VmaAllocator) !Transfer {
         log.info("Initializing transfer queue...", .{});
+
+        var self = Transfer{};
+        errdefer self.deinit();
+
         self.device = device;
         self.vma = vma;
-        errdefer self.deinit();
 
         self.createCommandPool() catch {
             log.err("Failed to create transfer command pool", .{});
@@ -58,6 +61,8 @@ pub const Transfer = struct {
             log.err("Failed to create transfer synchronization", .{});
             return error.FailedToCreateSynchronization;
         };
+
+        return self;
     }
 
     pub fn deinit(self: *Transfer) void {
@@ -70,16 +75,15 @@ pub const Transfer = struct {
     fn createCommandPool(self: *Transfer) !void {
         log.info("Creating transfer command pool", .{});
 
-        try self.command_pool.init(self.device, .{
+        self.command_pool = try CommandPool.init(self.device, .{
             .queue = .Transfer,
             .flags = c.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
         });
 
-        try self.command_buffer.init(
-            self.device,
-            &self.command_pool,
-            c.VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        );
+        self.command_buffer = try CommandBuffer.init(self.device, .{
+            .command_pool = &self.command_pool,
+            .level = c.VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        });
     }
 
     fn destroyCommandPool(self: *Transfer) void {
@@ -93,7 +97,7 @@ pub const Transfer = struct {
         const config = root.config.vulkan.transfer;
         self.staging_size = utility.fromKilobytes(config.staging_size_kb);
 
-        try self.staging_buffer.init(self.vma, .{
+        self.staging_buffer = try Buffer.init(self.vma, .{
             .size = self.staging_size,
             .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             .memory_flags = c.VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | c.VMA_ALLOCATION_CREATE_MAPPED_BIT,
@@ -133,6 +137,8 @@ pub const Transfer = struct {
     }
 
     pub fn upload(self: *Transfer, buffer: *Buffer, buffer_offset: usize, data: []const u8) !void {
+        std.debug.assert(self.staging_buffer.handle != null);
+        std.debug.assert(buffer.handle != null);
         std.debug.assert(data.len != 0);
 
         var data_offset: usize = 0;
@@ -199,6 +205,8 @@ pub const Transfer = struct {
     }
 
     pub fn submit(self: *Transfer) !void {
+        std.debug.assert(self.command_buffer.handle != null);
+
         if (self.buffer_copy_commands.items.len == 0 and self.buffer_ownership_transfers_source.items.len == 0)
             return;
 
@@ -285,6 +293,8 @@ pub const Transfer = struct {
     }
 
     pub fn recordOwnershipTransfers(self: *Transfer, command_buffer: *CommandBuffer) void {
+        std.debug.assert(command_buffer.handle != null);
+
         if (self.buffer_ownership_transfers_target.items.len == 0)
             return;
 

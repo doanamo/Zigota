@@ -48,8 +48,7 @@ pub const PipelineBuilder = struct {
     }
 
     pub fn loadShaderModule(self: *PipelineBuilder, shader_stage: ShaderStage, path: []const u8) !void {
-        var shader_module = ShaderModule{};
-        try shader_module.loadFromFile(self.device, path);
+        var shader_module = try ShaderModule.loadFromFile(self.device, path);
         errdefer shader_module.deinit();
 
         try self.shader_stages.append(memory.default_allocator, .{

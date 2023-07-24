@@ -19,42 +19,92 @@ pub const Vulkan = struct {
         transfer: Transfer.Config,
     };
 
-    instance: Instance = .{},
-    physical_device: PhysicalDevice = .{},
-    surface: Surface = .{},
-    device: Device = .{},
-    vma: VmaAllocator = .{},
-    swapchain: Swapchain = .{},
-    transfer: Transfer = .{},
+    pub const Heap = struct {
+        instance: Instance = .{},
+        physical_device: PhysicalDevice = .{},
+        surface: Surface = .{},
+        device: Device = .{},
+        vma: VmaAllocator = .{},
+        swapchain: Swapchain = .{},
+        transfer: Transfer = .{},
+    };
 
-    pub fn init(self: *Vulkan, window: *Window) !void {
+    heap: ?*Heap = null,
+
+    pub fn init(window: *Window) !Vulkan {
         log.info("Initializing...", .{});
+
+        var self = Vulkan{};
         errdefer self.deinit();
 
-        try self.instance.init();
-        try self.physical_device.init(&self.instance);
-        try self.surface.init(window, &self.instance, &self.physical_device);
-        try self.device.init(&self.physical_device, &self.surface);
-        try self.vma.init(&self.instance, &self.physical_device, &self.device);
-        try self.swapchain.init(window, &self.surface, &self.device, &self.vma);
-        try self.transfer.init(&self.device, &self.vma);
+        self.heap = try memory.default_allocator.create(Heap);
+        var heap = self.heap orelse unreachable;
+        heap.* = .{};
+
+        heap.instance = Instance.init() catch {
+            log.err("Failed to initialize instance", .{});
+            return error.FailedToInitializeInstance;
+        };
+
+        heap.physical_device = PhysicalDevice.init(&heap.instance) catch {
+            log.err("Failed to initialize physical device", .{});
+            return error.FailedToInitializePhysicalDevice;
+        };
+
+        heap.surface = Surface.init(window, &heap.instance, &heap.physical_device) catch {
+            log.err("Failed to initialize surface", .{});
+            return error.FailedToInitializeSurface;
+        };
+
+        heap.device = Device.init(&heap.physical_device, &heap.surface) catch {
+            log.err("Failed to initialize device", .{});
+            return error.FailedToInitializeDevice;
+        };
+
+        heap.vma = VmaAllocator.init(&heap.instance, &heap.physical_device, &heap.device) catch {
+            log.err("Failed to initialize allocator", .{});
+            return error.FailedToInitializeAllocator;
+        };
+
+        heap.swapchain = Swapchain.init(window, &heap.surface, &heap.device, &heap.vma) catch {
+            log.err("Failed to initialize swapchain", .{});
+            return error.FailedToInitializeSwapchain;
+        };
+
+        heap.transfer = Transfer.init(&heap.device, &heap.vma) catch {
+            log.err("Failed to initialize transfer", .{});
+            return error.FailedToInitializeTransfer;
+        };
+
+        return self;
     }
 
     pub fn deinit(self: *Vulkan) void {
         log.info("Deinitializing...", .{});
-        self.device.waitIdle();
 
-        self.transfer.deinit();
-        self.swapchain.deinit();
-        self.vma.deinit();
-        self.device.deinit();
-        self.surface.deinit();
-        self.physical_device.deinit();
-        self.instance.deinit();
+        if (self.heap) |heap| {
+            heap.device.waitIdle();
+            heap.transfer.deinit();
+            heap.swapchain.deinit();
+            heap.vma.deinit();
+            heap.device.deinit();
+            heap.surface.deinit();
+            heap.physical_device.deinit();
+            heap.instance.deinit();
+
+            memory.default_allocator.destroy(heap);
+        }
+        self.* = undefined;
     }
 
     pub fn recreateSwapchain(self: *Vulkan) !void {
-        self.device.waitIdle();
-        try self.swapchain.recreate();
+        self.heap.?.device.waitIdle();
+        try self.heap.?.swapchain.recreate();
+    }
+
+    pub fn waitIdle(self: *Vulkan) void {
+        if (self.heap) |heap| {
+            heap.device.waitIdle();
+        }
     }
 };

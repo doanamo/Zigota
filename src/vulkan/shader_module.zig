@@ -18,7 +18,7 @@ pub const ShaderModule = struct {
     handle: c.VkShaderModule = null,
     device: *Device = undefined,
 
-    pub fn loadFromFile(self: *ShaderModule, device: *Device, path: []const u8) !void {
+    pub fn loadFromFile(device: *Device, path: []const u8) !ShaderModule {
         log.info("Loading shader module from \"{s}\" file...", .{path});
 
         const byte_code = try std.fs.cwd().readFileAllocOptions(
@@ -31,17 +31,21 @@ pub const ShaderModule = struct {
         );
         defer memory.frame_allocator.free(byte_code);
 
-        try self.init(device, byte_code);
+        return try ShaderModule.init(device, byte_code);
     }
 
-    pub fn init(self: *ShaderModule, device: *Device, bytes: ByteCode) !void {
-        self.device = device;
+    pub fn init(device: *Device, bytes: ByteCode) !ShaderModule {
+        var self = ShaderModule{};
         errdefer self.deinit();
+
+        self.device = device;
 
         self.createShaderModule(bytes) catch {
             log.err("Failed to create shader module", .{});
             return error.FailedToCreateShaderModule;
         };
+
+        return self;
     }
 
     pub fn deinit(self: *ShaderModule) void {
