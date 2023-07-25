@@ -6,6 +6,8 @@ const Environment = struct {
     vulkan_lib_path: [:0]const u8,
     vulkan_bin_path: [:0]const u8,
     vulkan_glslc_path: [:0]const u8,
+    blender_path: [:0]const u8,
+    blender_exe_path: [:0]const u8,
 
     pub fn init() !Environment {
         const vulkan_sdk_path = try std.process.getEnvVarOwned(allocator, "VULKAN_SDK");
@@ -23,12 +25,18 @@ const Environment = struct {
         const vulkan_glslc_path = try std.fs.path.joinZ(allocator, &[_][]const u8{ vulkan_bin_path, "glslc.exe" });
         errdefer allocator.free(vulkan_glslc_path);
 
+        const blender_path_hardcoded_windows = "C:\\Program Files\\Blender Foundation\\Blender 3.6";
+        const blender_exe_path_hardcoded_windows = try std.fs.path.joinZ(allocator, &[_][]const u8{ blender_path_hardcoded_windows, "blender.exe" });
+        errdefer allocator.free(blender_exe_path_hardcoded_windows);
+
         return Environment{
             .vulkan_sdk_path = vulkan_sdk_path,
             .vulkan_include_path = vulkan_include_path,
             .vulkan_lib_path = vulkan_lib_path,
             .vulkan_bin_path = vulkan_bin_path,
             .vulkan_glslc_path = vulkan_glslc_path,
+            .blender_path = blender_path_hardcoded_windows,
+            .blender_exe_path = blender_exe_path_hardcoded_windows,
         };
     }
 
@@ -251,7 +259,7 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
         const input_file_path = try std.fs.path.joinZ(allocator, &[_][]const u8{ input_dir_path, entry.path });
         defer allocator.free(input_file_path);
 
-        const output_file_path = try std.fmt.allocPrint(allocator, "{s}{s}.spv", .{ output_dir_path, entry.basename });
+        const output_file_path = try std.fmt.allocPrint(allocator, "{s}{s}.spv", .{ output_dir_path, entry.path });
         defer allocator.free(output_file_path);
 
         var output_exists = true;
@@ -285,6 +293,79 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
     }
 }
 
+fn exportMeshes(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
+    const input_dir_path = "assets/meshes/";
+    var input_dir = try std.fs.cwd().openIterableDir(input_dir_path, .{});
+    defer input_dir.close();
+
+    const output_dir_path = "deploy/data/meshes/";
+    try std.fs.cwd().makePath(output_dir_path);
+
+    var blender_dir = try std.fs.openDirAbsolute(environment.blender_path, .{});
+    defer blender_dir.close();
+
+    var cache = std.Build.Cache{
+        .gpa = allocator,
+        .manifest_dir = try std.fs.cwd().makeOpenPath("zig-cache/assets/meshes/", .{}),
+    };
+    cache.addPrefix(.{ .path = input_dir_path, .handle = input_dir.dir });
+    cache.addPrefix(.{ .path = environment.blender_path, .handle = blender_dir });
+    defer cache.manifest_dir.close();
+
+    const export_script_path = try std.fs.path.joinZ(allocator, &[_][]const u8{ input_dir_path, "export.py" });
+    defer allocator.free(export_script_path);
+
+    var walker = try input_dir.walk(allocator);
+    defer walker.deinit();
+
+    while (try walker.next()) |entry| {
+        if (entry.kind != .file) {
+            continue;
+        }
+
+        const input_file_path = try std.fs.path.joinZ(allocator, &[_][]const u8{ input_dir_path, entry.path });
+        defer allocator.free(input_file_path);
+
+        if (std.mem.eql(u8, input_file_path, export_script_path)) {
+            continue;
+        }
+
+        const output_file_path = try std.fmt.allocPrint(allocator, "{s}{s}.bin", .{ output_dir_path, std.fs.path.stem(entry.path) });
+        defer allocator.free(output_file_path);
+
+        var output_exists = true;
+        std.fs.cwd().access(output_file_path, .{}) catch |err| switch (err) {
+            error.FileNotFound => output_exists = false,
+            else => return err,
+        };
+
+        var manifest = cache.obtain();
+        defer manifest.deinit();
+
+        _ = try manifest.addFile(environment.blender_exe_path, null);
+        _ = try manifest.addFile(entry.path, null);
+        if (try manifest.hit() and output_exists) {
+            continue;
+        }
+
+        const export_mesh = builder.addSystemCommand(&[_][]const u8{
+            environment.blender_exe_path,
+            input_file_path,
+            "-b",
+            "-P",
+            export_script_path,
+            "--",
+            output_file_path,
+        });
+
+        exe.step.dependOn(&export_mesh.step);
+
+        if (manifest.have_exclusive_lock) {
+            try manifest.writeManifest();
+        }
+    }
+}
+
 fn createGame(builder: *std.build.Builder) !void {
     const game = builder.addExecutable(.{
         .name = "game",
@@ -304,6 +385,7 @@ fn createGame(builder: *std.build.Builder) !void {
     try addDependencyVulkan(builder, game);
     try addDependencyVma(builder, game);
     try compileShaders(builder, game);
+    try exportMeshes(builder, game);
     builder.installArtifact(game);
 
     const run = builder.addRunArtifact(game);
