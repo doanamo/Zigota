@@ -279,6 +279,7 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
 
         const glslc = builder.addSystemCommand(&[_][]const u8{
             environment.vulkan_glslc_path,
+            "-Werror",
             "-O",
             "-o",
             output_file_path,
