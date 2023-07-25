@@ -204,6 +204,24 @@ pub const Transfer = struct {
         });
     }
 
+    pub fn uploadFromReader(self: *Transfer, buffer: *Buffer, buffer_offset: usize, buffer_size: usize, reader: anytype) !void {
+        var temp_buffer: [4096]u8 = undefined;
+        var bytes_read_total: usize = 0;
+
+        while (bytes_read_total < buffer_size) {
+            const bytes_to_read = @min(temp_buffer.len, buffer_size - bytes_read_total);
+            const bytes_read = try reader.readAll(temp_buffer[0..bytes_to_read]);
+            if (bytes_read == 0) {
+                return error.EndOfStream;
+            }
+
+            try self.upload(buffer, buffer_offset + bytes_read_total, temp_buffer[0..bytes_read]);
+            bytes_read_total += bytes_read;
+        }
+
+        std.debug.assert(bytes_read_total == buffer_size);
+    }
+
     pub fn submit(self: *Transfer) !void {
         std.debug.assert(self.command_buffer.handle != null);
 

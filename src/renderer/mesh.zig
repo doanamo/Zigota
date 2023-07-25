@@ -98,11 +98,7 @@ pub const Mesh = struct {
                 }
 
                 const attribute_data_size = vertices_header.vertex_count * vertex_attributes.getVertexAttributeSize(attribute);
-                var attribute_data = try memory.frame_allocator.alloc(u8, attribute_data_size);
-                defer memory.frame_allocator.free(attribute_data);
-
-                try reader.readNoEof(attribute_data);
-                try transfer.upload(&self.vertex_buffer, current_attribute_offset, attribute_data);
+                try transfer.uploadFromReader(&self.vertex_buffer, current_attribute_offset, attribute_data_size, reader);
 
                 try self.attribute_offsets.append(memory.default_allocator, current_attribute_offset);
                 current_attribute_offset += attribute_data_size;
@@ -120,11 +116,7 @@ pub const Mesh = struct {
                 .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT | c.VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
             });
 
-            var index_data = try memory.frame_allocator.alloc(u8, self.index_buffer.size);
-            defer memory.frame_allocator.free(index_data);
-
-            try reader.readNoEof(index_data);
-            try transfer.upload(&self.index_buffer, 0, index_data);
+            try transfer.uploadFromReader(&self.index_buffer, 0, self.index_buffer.size, reader);
         }
 
         if (reader.readBytesNoEof(4) != error.EndOfStream) {
