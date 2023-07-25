@@ -236,7 +236,6 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
         .gpa = allocator,
         .manifest_dir = try std.fs.cwd().makeOpenPath("zig-cache/assets/shaders/", .{}),
     };
-
     cache.addPrefix(.{ .path = input_dir_path, .handle = input_dir.dir });
     cache.addPrefix(.{ .path = environment.vulkan_bin_path, .handle = vulkan_bin_dir });
     defer cache.manifest_dir.close();
@@ -255,12 +254,18 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
         const output_file_path = try std.fmt.allocPrint(allocator, "{s}{s}.spv", .{ output_dir_path, entry.basename });
         defer allocator.free(output_file_path);
 
+        var output_exists = true;
+        std.fs.cwd().access(output_file_path, .{}) catch |err| switch (err) {
+            error.FileNotFound => output_exists = false,
+            else => return err,
+        };
+
         var manifest = cache.obtain();
         defer manifest.deinit();
 
         _ = try manifest.addFile(environment.vulkan_glslc_path, null);
         _ = try manifest.addFile(entry.path, null);
-        if (try manifest.hit()) {
+        if (try manifest.hit() and output_exists) {
             continue;
         }
 
@@ -274,7 +279,9 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
 
         exe.step.dependOn(&glslc.step);
 
-        try manifest.writeManifest();
+        if (manifest.have_exclusive_lock) {
+            try manifest.writeManifest();
+        }
     }
 }
 
