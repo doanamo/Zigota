@@ -302,15 +302,17 @@ pub const Renderer = struct {
         const width: f32 = @floatFromInt(window.getWidth());
         const height: f32 = @floatFromInt(window.getHeight());
 
-        const camera_position = math.Vec3{ 0.0, 0.0, -1.0 };
+        const camera_position = math.Vec3{ 1.0, 0.0, 1.0 };
+        const camera_target = math.Vec3{ 0.0, 0.0, 0.0 };
+        const camera_up = math.Vec3{ 0.0, 0.0, 1.0 };
 
         const uniform_object = VertexTransformUniform{
             .model = math.mul(
-                math.scaling(math.Vec3{ 0.33, 0.33, 0.33 }),
+                math.scaling(math.Vec3{ 0.5, 0.5, 0.5 }),
                 math.rotation(math.Vec3{ math.radians(30.0) * self.time, 0.0, math.radians(30.0) * self.time }),
             ),
-            .view = math.translation(camera_position * math.splat3(-1.0)),
-            .projection = math.perspectiveFov(math.radians(90.0), width / height, 0.0001, 1000.0),
+            .view = math.lookAt(camera_position, camera_target, camera_up),
+            .projection = math.perspectiveFov(math.radians(90.0), width / height, 0.01, 1000.0),
         };
 
         try uniform_buffer.upload(std.mem.asBytes(&uniform_object), 0);
