@@ -230,12 +230,15 @@ fn addDependencyVma(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) 
 }
 
 fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
-    const input_dir_path = "assets/shaders/";
+    const input_dir_path = try std.fs.path.resolve(allocator, &[_][]const u8{"assets/shaders/"});
+    defer allocator.free(input_dir_path);
+
+    const output_dir_path = try std.fs.path.resolve(allocator, &[_][]const u8{"deploy/data/shaders/"});
+    defer allocator.free(output_dir_path);
+    try std.fs.cwd().makePath(output_dir_path);
+
     var input_dir = try std.fs.cwd().openIterableDir(input_dir_path, .{});
     defer input_dir.close();
-
-    const output_dir_path = "deploy/data/shaders/";
-    try std.fs.cwd().makePath(output_dir_path);
 
     var vulkan_bin_dir = try std.fs.openDirAbsolute(environment.vulkan_bin_path, .{});
     defer vulkan_bin_dir.close();
@@ -244,7 +247,7 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
         .gpa = allocator,
         .manifest_dir = try std.fs.cwd().makeOpenPath("zig-cache/assets/shaders/", .{}),
     };
-    cache.addPrefix(.{ .path = input_dir_path, .handle = input_dir.dir });
+    cache.addPrefix(.{ .path = null, .handle = input_dir.dir });
     cache.addPrefix(.{ .path = environment.vulkan_bin_path, .handle = vulkan_bin_dir });
     defer cache.manifest_dir.close();
 
@@ -295,12 +298,15 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
 }
 
 fn exportMeshes(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
-    const input_dir_path = "assets/meshes/";
+    const input_dir_path = try std.fs.path.resolve(allocator, &[_][]const u8{"assets/meshes/"});
+    defer allocator.free(input_dir_path);
+
+    const output_dir_path = try std.fs.path.resolve(allocator, &[_][]const u8{"deploy/data/meshes/"});
+    defer allocator.free(output_dir_path);
+    try std.fs.cwd().makePath(output_dir_path);
+
     var input_dir = try std.fs.cwd().openIterableDir(input_dir_path, .{});
     defer input_dir.close();
-
-    const output_dir_path = "deploy/data/meshes/";
-    try std.fs.cwd().makePath(output_dir_path);
 
     var blender_dir = try std.fs.openDirAbsolute(environment.blender_path, .{});
     defer blender_dir.close();
@@ -309,11 +315,12 @@ fn exportMeshes(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !voi
         .gpa = allocator,
         .manifest_dir = try std.fs.cwd().makeOpenPath("zig-cache/assets/meshes/", .{}),
     };
-    cache.addPrefix(.{ .path = input_dir_path, .handle = input_dir.dir });
+    cache.addPrefix(.{ .path = null, .handle = input_dir.dir });
     cache.addPrefix(.{ .path = environment.blender_path, .handle = blender_dir });
     defer cache.manifest_dir.close();
 
-    const export_script_path = try std.fs.path.joinZ(allocator, &[_][]const u8{ input_dir_path, "export.py" });
+    const export_script_filename = "export.py";
+    const export_script_path = try std.fs.path.joinZ(allocator, &[_][]const u8{ input_dir_path, export_script_filename });
     defer allocator.free(export_script_path);
 
     var walker = try input_dir.walk(allocator);
@@ -344,6 +351,7 @@ fn exportMeshes(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !voi
         defer manifest.deinit();
 
         _ = try manifest.addFile(environment.blender_exe_path, null);
+        _ = try manifest.addFile(export_script_filename, null);
         _ = try manifest.addFile(entry.path, null);
         if (try manifest.hit() and output_exists) {
             continue;
