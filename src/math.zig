@@ -77,17 +77,14 @@ pub fn scaling(scale: Vec3) Mat4 {
 }
 
 pub fn perspectiveFov(fovy: f32, aspect: f32, near: f32, far: f32) Mat4 {
-    // Perspective projection in right handed coordinates (OpenGL default) with depth in [0.0, 1.0] range
     const tanHalfFovy = @tan(fovy * 0.5);
-
-    const w = 1 / (aspect * tanHalfFovy);
-    const h = 1 / tanHalfFovy;
-    const r = far - near;
+    const w = 1.0 / (aspect * tanHalfFovy);
+    const h = -1.0 / tanHalfFovy;
 
     return .{
         Vec4{ w, 0.0, 0.0, 0.0 },
         Vec4{ 0.0, h, 0.0, 0.0 },
-        Vec4{ 0.0, 0.0, far / r, 1.0 },
-        Vec4{ 0.0, 0.0, -(near * far) / r, 0.0 },
+        Vec4{ 0.0, 0.0, far / (near - far), -1.0 },
+        Vec4{ 0.0, 0.0, -(far * near) / (far - near), 0.0 },
     };
 }
