@@ -185,8 +185,8 @@ pub const Transfer = struct {
             .srcQueueFamilyIndex = self.device.getQueue(.Transfer).index,
             .dstQueueFamilyIndex = self.device.getQueue(.Graphics).index,
             .buffer = buffer.handle,
-            .offset = 0,
-            .size = c.VK_WHOLE_SIZE,
+            .offset = buffer_offset,
+            .size = data.len,
         });
 
         try self.buffer_ownership_transfers_target.append(memory.default_allocator, c.VkBufferMemoryBarrier2{
@@ -199,8 +199,8 @@ pub const Transfer = struct {
             .srcQueueFamilyIndex = self.device.getQueue(.Transfer).index,
             .dstQueueFamilyIndex = self.device.getQueue(.Graphics).index,
             .buffer = buffer.handle,
-            .offset = 0,
-            .size = c.VK_WHOLE_SIZE,
+            .offset = buffer_offset,
+            .size = data.len,
         });
     }
 
