@@ -100,7 +100,7 @@ pub const Swapchain = struct {
             .height = self.window.getHeight(),
         };
 
-        self.image_format = c.VK_FORMAT_B8G8R8A8_UNORM;
+        self.image_format = c.VK_FORMAT_B8G8R8A8_SRGB;
         self.color_space = c.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 
         const present_mode = for (self.surface.present_modes) |supported_mode| {
