@@ -262,7 +262,10 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
         const input_file_path = try std.fs.path.joinZ(allocator, &[_][]const u8{ input_dir_path, entry.path });
         defer allocator.free(input_file_path);
 
-        const output_file_path = try std.fmt.allocPrint(allocator, "{s}{s}.spv", .{ output_dir_path, entry.path });
+        const output_file_name = try std.fmt.allocPrint(allocator, "{s}.spv", .{entry.path});
+        defer allocator.free(output_file_name);
+
+        const output_file_path = try std.fs.path.joinZ(allocator, &[_][]const u8{ output_dir_path, output_file_name });
         defer allocator.free(output_file_path);
 
         var output_exists = true;
@@ -338,7 +341,10 @@ fn exportMeshes(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !voi
             continue;
         }
 
-        const output_file_path = try std.fmt.allocPrint(allocator, "{s}{s}.bin", .{ output_dir_path, std.fs.path.stem(entry.path) });
+        const output_file_name = try std.fmt.allocPrint(allocator, "{s}.bin", .{std.fs.path.stem(entry.path)});
+        defer allocator.free(output_file_name);
+
+        const output_file_path = try std.fs.path.joinZ(allocator, &[_][]const u8{ output_dir_path, output_file_name });
         defer allocator.free(output_file_path);
 
         var output_exists = true;
