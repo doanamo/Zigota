@@ -157,7 +157,7 @@ pub const Renderer = struct {
     fn createMesh(self: *Renderer) !void {
         log.info("Creating mesh...", .{});
 
-        self.mesh = Mesh.init(&self.vulkan.heap.?.transfer, "data/meshes/cube.bin") catch |err| {
+        self.mesh = Mesh.init(&self.vulkan.heap.?.transfer, "data/meshes/monkey.bin") catch |err| {
             log.err("Failed to load mesh ({})", .{err});
             return error.FailedToLoadMesh;
         };
@@ -302,17 +302,17 @@ pub const Renderer = struct {
         const width: f32 = @floatFromInt(window.getWidth());
         const height: f32 = @floatFromInt(window.getHeight());
 
-        const camera_position = math.Vec3{ 1.0, 0.0, 1.0 };
+        const camera_position = math.Vec3{ 0.0, -1.0, 0.5 };
         const camera_target = math.Vec3{ 0.0, 0.0, 0.0 };
         const camera_up = math.Vec3{ 0.0, 0.0, 1.0 };
 
         const uniform_object = VertexTransformUniform{
             .model = math.mul(
-                math.scaling(math.Vec3{ 0.5, 0.5, 0.5 }),
-                math.rotation(math.Vec3{ math.radians(30.0) * self.time, 0.0, math.radians(30.0) * self.time }),
+                math.scaling(math.splat(math.Vec3, 0.5)),
+                math.rotation(math.Vec3{ 0.0, 0.0, math.radians(30.0) * self.time }),
             ),
             .view = math.lookAt(camera_position, camera_target, camera_up),
-            .projection = math.perspectiveFov(math.radians(90.0), width / height, 0.01, 1000.0),
+            .projection = math.perspectiveFov(math.radians(70.0), width / height, 0.01, 1000.0),
         };
 
         try uniform_buffer.upload(std.mem.asBytes(&uniform_object), 0);
