@@ -22,4 +22,4 @@ void main() {
     out_position = (view_model * vec4(in_position, 1.0)).xyz;
     out_normal = (ubo.model * vec4(in_normal, 0.0)).xyz;
     out_color = in_color;
-}   
+}
