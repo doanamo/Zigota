@@ -11,7 +11,8 @@ pub const Buffer = struct {
     handle: c.VkBuffer = null,
     allocation: c.VmaAllocation = undefined,
     vma: *VmaAllocator = undefined,
-    size: usize = 0,
+    usage_flags: c.VkBufferUsageFlags = undefined,
+    size: usize = undefined,
 
     pub fn init(vma: *VmaAllocator, params: struct {
         size: usize,
@@ -25,6 +26,7 @@ pub const Buffer = struct {
         errdefer self.deinit();
 
         self.vma = vma;
+        self.usage_flags = params.usage_flags;
         self.size = params.size;
 
         const buffer_create_info = c.VkBufferCreateInfo{

@@ -189,12 +189,21 @@ pub const Transfer = struct {
             .size = data.len,
         });
 
+        var destination_stage_mask: c.VkPipelineStageFlags2 = undefined;
+        if (buffer.usage_flags & c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT != 0) {
+            destination_stage_mask = c.VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT;
+        } else if (buffer.usage_flags & c.VK_BUFFER_USAGE_INDEX_BUFFER_BIT != 0) {
+            destination_stage_mask = c.VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
+        } else {
+            std.debug.panic("Unsupported buffer usage flags", .{});
+        }
+
         try self.buffer_ownership_transfers_target.append(memory.default_allocator, c.VkBufferMemoryBarrier2{
             .sType = c.VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
             .pNext = null,
             .srcStageMask = 0,
             .srcAccessMask = 0,
-            .dstStageMask = c.VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT,
+            .dstStageMask = destination_stage_mask,
             .dstAccessMask = c.VK_ACCESS_2_MEMORY_READ_BIT,
             .srcQueueFamilyIndex = self.device.getQueue(.Transfer).index,
             .dstQueueFamilyIndex = self.device.getQueue(.Graphics).index,
