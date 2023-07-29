@@ -92,6 +92,11 @@ if has_color_attribute:
             int(color[2] * 255 + 0.5),
             int(color[3] * 255 + 0.5)))
 
+if has_uv_attribute:
+    for index, vertex in enumerate(mesh.vertices):
+        uv = mesh.uv_layers[0].data[index].uv
+        file.write(struct.pack('ff', uv[0], uv[1]))
+
 # Write indices header
 if len(mesh.vertices) < 65536:
     print("Index type: uint16")
