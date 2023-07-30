@@ -208,6 +208,24 @@ fn addDependencyVulkan(builder: *std.build.Builder, exe: *std.build.LibExeObjSte
     exe.linkLibrary(vulkan);
 }
 
+fn addDependencySpirvReflect(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
+    const spirv_reflect = builder.addStaticLibrary(.{
+        .name = "spirv_reflect",
+        .target = target,
+        .optimize = optimize,
+    });
+
+    var flags = std.ArrayList([]const u8).init(allocator);
+    defer flags.deinit();
+
+    spirv_reflect.addIncludePath("deps/spirv-reflect/");
+    spirv_reflect.addCSourceFile("deps/spirv-reflect/spirv_reflect.c", flags.items);
+    spirv_reflect.linkLibC();
+
+    exe.addIncludePath("deps/spirv-reflect/");
+    exe.linkLibrary(spirv_reflect);
+}
+
 fn addDependencyVma(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
     const vma = builder.addStaticLibrary(.{
         .name = "vma",
@@ -398,6 +416,7 @@ fn createGame(builder: *std.build.Builder) !void {
     try addDependencyGlfw(builder, game);
     try addDependencyVolk(builder, game);
     try addDependencyVulkan(builder, game);
+    try addDependencySpirvReflect(builder, game);
     try addDependencyVma(builder, game);
     try compileShaders(builder, game);
     try exportMeshes(builder, game);
