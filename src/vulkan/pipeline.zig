@@ -7,6 +7,7 @@ const log = std.log.scoped(.Vulkan);
 const check = utility.vulkanCheckResult;
 
 const Device = @import("device.zig").Device;
+const Swapchain = @import("swapchain.zig").Swapchain;
 const ShaderStage = @import("shader_module.zig").ShaderStage;
 const ShaderModule = @import("shader_module.zig").ShaderModule;
 const VertexAttributeType = vertex_attributes.VertexAttributeType;
@@ -109,6 +110,12 @@ pub const PipelineBuilder = struct {
 
     pub fn setStencilAttachmentFormat(self: *PipelineBuilder, format: c.VkFormat) void {
         self.stencil_attachment_format = format;
+    }
+
+    pub fn setSwapchainAttachmentFormats(self: *PipelineBuilder, swapchain: *Swapchain) void {
+        self.color_attachment_format = swapchain.image_format;
+        self.depth_attachment_format = swapchain.depth_stencil_image_format;
+        self.stencil_attachment_format = swapchain.depth_stencil_image_format;
     }
 
     pub fn setDepthTest(self: *PipelineBuilder, test_enable: bool) void {

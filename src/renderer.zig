@@ -171,11 +171,7 @@ pub const Renderer = struct {
         try builder.addVertexAttribute(.Normal, false);
         try builder.addVertexAttribute(.Color, false);
 
-        builder.setDepthTest(true);
-        builder.setDepthWrite(true);
-        builder.setColorAttachmentFormat(swapchain.image_format);
-        builder.setDepthAttachmentFormat(swapchain.depth_stencil_image_format);
-        builder.setStencilAttachmentFormat(swapchain.depth_stencil_image_format);
+        builder.setSwapchainAttachmentFormats(swapchain);
         builder.setPipelineLayout(self.pipeline_layout);
 
         self.pipeline = try builder.build();
