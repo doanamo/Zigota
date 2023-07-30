@@ -27,8 +27,8 @@ pub const PipelineBuilder = struct {
     color_attachment_format: c.VkFormat = c.VK_FORMAT_UNDEFINED,
     depth_attachment_format: c.VkFormat = c.VK_FORMAT_UNDEFINED,
     stencil_attachment_format: c.VkFormat = c.VK_FORMAT_UNDEFINED,
-    depth_test_enable: bool = false,
-    depth_write_enable: bool = false,
+    depth_test_enable: bool = true,
+    depth_write_enable: bool = true,
     stencil_test_enable: bool = false,
     pipeline_layout: c.VkPipelineLayout = null,
 
