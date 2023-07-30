@@ -3,23 +3,25 @@ const c = @import("../c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const vertex_attributes = @import("vertex_attributes.zig");
+const log = std.log.scoped(.Vulkan);
+const check = utility.vulkanCheckResult;
 
 const Device = @import("device.zig").Device;
 const ShaderStage = @import("shader_module.zig").ShaderStage;
 const ShaderModule = @import("shader_module.zig").ShaderModule;
 const VertexAttributeType = vertex_attributes.VertexAttributeType;
 
-const log = std.log.scoped(.Vulkan);
-const check = utility.vulkanCheckResult;
-
 pub const PipelineBuilder = struct {
-    const ShaderStages = std.ArrayListUnmanaged(struct {
+    const shader_stage_count = @typeInfo(ShaderStage).Enum.fields.len;
+    const ShaderStageEntry = std.ArrayListUnmanaged(struct {
         stage: ShaderStage,
         module: ShaderModule,
     });
 
-    device: *Device,
-    shader_stages: ShaderStages,
+    device: *Device = undefined,
+    shader_stages: ShaderStageEntry = .{},
+    shader_stages_mask: c.VkShaderStageFlagBits = 0,
+    shader_stage_create_infos: std.ArrayListUnmanaged(c.VkPipelineShaderStageCreateInfo) = .{},
     vertex_binding_descriptions: std.ArrayListUnmanaged(c.VkVertexInputBindingDescription) = .{},
     vertex_attribute_descriptions: std.ArrayListUnmanaged(c.VkVertexInputAttributeDescription) = .{},
     color_attachment_format: c.VkFormat = c.VK_FORMAT_UNDEFINED,
@@ -31,10 +33,14 @@ pub const PipelineBuilder = struct {
     pipeline_layout: c.VkPipelineLayout = null,
 
     pub fn init(device: *Device) !PipelineBuilder {
-        return PipelineBuilder{
-            .device = device,
-            .shader_stages = try ShaderStages.initCapacity(memory.frame_allocator, @typeInfo(ShaderStage).Enum.fields.len),
-        };
+        var self = PipelineBuilder{};
+        errdefer self.deinit();
+
+        self.device = device;
+        try self.shader_stages.ensureTotalCapacityPrecise(memory.frame_allocator, shader_stage_count);
+        try self.shader_stage_create_infos.ensureTotalCapacityPrecise(memory.frame_allocator, shader_stage_count);
+
+        return self;
     }
 
     pub fn deinit(self: *PipelineBuilder) void {
@@ -51,7 +57,26 @@ pub const PipelineBuilder = struct {
         var shader_module = try ShaderModule.loadFromFile(self.device, path);
         errdefer shader_module.deinit();
 
-        try self.shader_stages.append(memory.default_allocator, .{
+        const shader_stage_flag = @intFromEnum(shader_stage);
+        if (std.debug.runtime_safety) {
+            if (self.shader_stages_mask & shader_stage_flag != 0) {
+                return error.ShaderStageAlreadyEnabled;
+            }
+
+            self.shader_stages_mask |= shader_stage_flag;
+        }
+
+        self.shader_stage_create_infos.appendAssumeCapacity(.{
+            .sType = c.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .pNext = null,
+            .flags = 0,
+            .stage = shader_stage_flag,
+            .module = shader_module.handle,
+            .pName = "main",
+            .pSpecializationInfo = null,
+        });
+
+        self.shader_stages.appendAssumeCapacity(.{
             .stage = shader_stage,
             .module = shader_module,
         });
@@ -103,21 +128,6 @@ pub const PipelineBuilder = struct {
     }
 
     pub fn build(self: *PipelineBuilder) !Pipeline {
-        var shader_stage_create_infos = try memory.default_allocator.alloc(c.VkPipelineShaderStageCreateInfo, self.shader_stages.items.len);
-        defer memory.default_allocator.free(shader_stage_create_infos);
-
-        for (self.shader_stages.items, 0..) |shader_stage, i| {
-            shader_stage_create_infos[i] = .{
-                .sType = c.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                .pNext = null,
-                .flags = 0,
-                .stage = @intFromEnum(shader_stage.stage),
-                .module = shader_stage.module.handle,
-                .pName = "main",
-                .pSpecializationInfo = null,
-            };
-        }
-
         const input_assembly_state_create_info = c.VkPipelineInputAssemblyStateCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
             .pNext = null,
@@ -254,8 +264,8 @@ pub const PipelineBuilder = struct {
             .sType = c.VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
             .pNext = &pipeline_rendering_create_info,
             .flags = 0,
-            .stageCount = @intCast(shader_stage_create_infos.len),
-            .pStages = shader_stage_create_infos.ptr,
+            .stageCount = @intCast(self.shader_stage_create_infos.items.len),
+            .pStages = self.shader_stage_create_infos.items.ptr,
             .pVertexInputState = &vertex_input_state_create_info,
             .pInputAssemblyState = &input_assembly_state_create_info,
             .pTessellationState = null,
