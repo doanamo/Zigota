@@ -13,7 +13,8 @@ pub const DescriptorPool = struct {
 
     pub fn init(device: *Device, params: struct {
         max_set_count: u32,
-        uniform_buffer_count: u32,
+        pool_sizes: []const c.VkDescriptorPoolSize,
+        flags: c.VkDescriptorPoolCreateFlags = 0,
     }) !DescriptorPool {
         var self = DescriptorPool{};
         errdefer self.deinit();
@@ -23,13 +24,10 @@ pub const DescriptorPool = struct {
         const pool_create_info = c.VkDescriptorPoolCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
             .pNext = null,
-            .flags = 0,
+            .flags = params.flags,
             .maxSets = params.max_set_count,
-            .poolSizeCount = 1,
-            .pPoolSizes = &c.VkDescriptorPoolSize{
-                .type = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .descriptorCount = params.uniform_buffer_count,
-            },
+            .poolSizeCount = @intCast(params.pool_sizes.len),
+            .pPoolSizes = params.pool_sizes.ptr,
         };
 
         check(c.vkCreateDescriptorPool.?(self.device.handle, &pool_create_info, memory.vulkan_allocator, &self.handle)) catch |err| {

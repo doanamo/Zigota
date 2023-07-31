@@ -101,7 +101,12 @@ pub const Renderer = struct {
 
         self.descriptor_pool = try DescriptorPool.init(device, .{
             .max_set_count = swapchain.max_inflight_frames,
-            .uniform_buffer_count = swapchain.max_inflight_frames,
+            .pool_sizes = &[_]c.VkDescriptorPoolSize{
+                .{
+                    .type = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                    .descriptorCount = swapchain.max_inflight_frames,
+                },
+            },
         });
     }
 
