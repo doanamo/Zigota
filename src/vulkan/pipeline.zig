@@ -14,13 +14,13 @@ const VertexAttributeType = vertex_attributes.VertexAttributeType;
 
 pub const PipelineBuilder = struct {
     const shader_stage_count = @typeInfo(ShaderStage).Enum.fields.len;
-    const ShaderStageEntry = std.ArrayListUnmanaged(struct {
+    const ShaderStageEntry = struct {
         stage: ShaderStage,
         module: ShaderModule,
-    });
+    };
 
     device: *Device = undefined,
-    shader_stages: ShaderStageEntry = .{},
+    shader_stages: std.ArrayListUnmanaged(ShaderStageEntry) = .{},
     shader_stages_mask: c.VkShaderStageFlagBits = 0,
     shader_stage_create_infos: std.ArrayListUnmanaged(c.VkPipelineShaderStageCreateInfo) = .{},
     vertex_binding_descriptions: std.ArrayListUnmanaged(c.VkVertexInputBindingDescription) = .{},
