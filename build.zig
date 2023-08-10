@@ -109,10 +109,10 @@ fn addDependencyMimalloc(builder: *std.build.Builder, exe: *std.build.LibExeObjS
         "deps/mimalloc/src/stats.c",
     }, flags.items);
 
-    mimalloc.addIncludePath("deps/mimalloc/include/");
+    mimalloc.addIncludePath(.{ .path = "deps/mimalloc/include/" });
     mimalloc.linkLibC();
 
-    exe.addIncludePath("deps/mimalloc/include/");
+    exe.addIncludePath(.{ .path = "deps/mimalloc/include/" });
     exe.linkLibrary(mimalloc);
 }
 
@@ -157,7 +157,7 @@ fn addDependencyGlfw(builder: *std.build.Builder, exe: *std.build.LibExeObjStep)
     }, flags.items);
     glfw.linkLibC();
 
-    exe.addIncludePath("deps/glfw/include/");
+    exe.addIncludePath(.{ .path = "deps/glfw/include/" });
     exe.linkLibrary(glfw);
 }
 
@@ -179,12 +179,12 @@ fn addDependencyVolk(builder: *std.build.Builder, exe: *std.build.LibExeObjStep)
         else => unreachable,
     }
 
-    volk.addIncludePath(environment.vulkan_include_path);
-    volk.addIncludePath("deps/volk/");
-    volk.addCSourceFile("deps/volk/volk.c", flags.items);
+    volk.addIncludePath(.{ .path = environment.vulkan_include_path });
+    volk.addIncludePath(.{ .path = "deps/volk/" });
+    volk.addCSourceFile(.{ .file = .{ .path = "deps/volk/volk.c" }, .flags = flags.items });
     volk.linkLibC();
 
-    exe.addIncludePath("deps/volk/");
+    exe.addIncludePath(.{ .path = "deps/volk/" });
     exe.linkLibrary(volk);
 }
 
@@ -200,11 +200,11 @@ fn addDependencyVulkan(builder: *std.build.Builder, exe: *std.build.LibExeObjSte
 
     try flags.append("-std=c++11");
 
-    vulkan.addIncludePath(environment.vulkan_include_path);
-    vulkan.addCSourceFile("src/c/vulkan.cpp", flags.items);
+    vulkan.addIncludePath(.{ .path = environment.vulkan_include_path });
+    vulkan.addCSourceFile(.{ .file = .{ .path = "src/c/vulkan.cpp" }, .flags = flags.items });
     vulkan.linkLibCpp();
 
-    exe.addIncludePath(environment.vulkan_include_path);
+    exe.addIncludePath(.{ .path = environment.vulkan_include_path });
     exe.linkLibrary(vulkan);
 }
 
@@ -218,11 +218,11 @@ fn addDependencySpirvReflect(builder: *std.build.Builder, exe: *std.build.LibExe
     var flags = std.ArrayList([]const u8).init(allocator);
     defer flags.deinit();
 
-    spirv_reflect.addIncludePath("deps/spirv-reflect/");
-    spirv_reflect.addCSourceFile("deps/spirv-reflect/spirv_reflect.c", flags.items);
+    spirv_reflect.addIncludePath(.{ .path = "deps/spirv-reflect/" });
+    spirv_reflect.addCSourceFile(.{ .file = .{ .path = "deps/spirv-reflect/spirv_reflect.c" }, .flags = flags.items });
     spirv_reflect.linkLibC();
 
-    exe.addIncludePath("deps/spirv-reflect/");
+    exe.addIncludePath(.{ .path = "deps/spirv-reflect/" });
     exe.linkLibrary(spirv_reflect);
 }
 
@@ -238,12 +238,12 @@ fn addDependencyVma(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) 
 
     try flags.append("-std=c++14");
 
-    vma.addIncludePath(environment.vulkan_include_path);
-    vma.addIncludePath("deps/vma/src/");
-    vma.addCSourceFile("src/c/vma.cpp", flags.items);
+    vma.addIncludePath(.{ .path = environment.vulkan_include_path });
+    vma.addIncludePath(.{ .path = "deps/vma/src/" });
+    vma.addCSourceFile(.{ .file = .{ .path = "src/c/vma.cpp" }, .flags = flags.items });
     vma.linkLibCpp();
 
-    exe.addIncludePath("deps/vma/src/");
+    exe.addIncludePath(.{ .path = "deps/vma/src/" });
     exe.linkLibrary(vma);
 }
 
@@ -411,7 +411,7 @@ fn createGame(builder: *std.build.Builder) !void {
         game.subsystem = .Windows; // Hide console window
     }
 
-    game.addIncludePath("src/c/");
+    game.addIncludePath(.{ .path = "src/c/" });
     try addDependencyMimalloc(builder, game);
     try addDependencyGlfw(builder, game);
     try addDependencyVolk(builder, game);

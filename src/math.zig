@@ -18,12 +18,7 @@ pub inline fn degrees(rad: f32) f32 {
 }
 
 pub inline fn splat(comptime T: type, value: f32) T {
-    switch (T) {
-        Vec2 => return @splat(2, value),
-        Vec3 => return @splat(3, value),
-        Vec4 => return @splat(4, value),
-        else => @compileError("Expected vector, found '" ++ @typeName(T) ++ "'"),
-    }
+    return @as(T, @splat(value));
 }
 
 pub inline fn dot(a: anytype, b: @TypeOf(a)) f32 {
@@ -49,10 +44,7 @@ pub inline fn length(v: anytype) f32 {
 }
 
 pub inline fn normalize(v: anytype) @TypeOf(v) {
-    switch (@TypeOf(v)) {
-        Vec2, Vec3, Vec4 => return v / splat(@TypeOf(v), length(v)),
-        else => @compileError("Expected vector, found '" ++ @typeName(@TypeOf(v)) ++ "'"),
-    }
+    return v / splat(@TypeOf(v), length(v));
 }
 
 pub fn identity() Mat4 {
