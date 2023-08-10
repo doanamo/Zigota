@@ -6,12 +6,16 @@ const log = std.log.scoped(.Vulkan);
 const check = utility.vulkanCheckResult;
 
 const VmaAllocator = @import("vma.zig").VmaAllocator;
+const Bindless = @import("bindless.zig").Bindless;
 
 pub const Buffer = struct {
     handle: c.VkBuffer = null,
-    allocation: c.VmaAllocation = undefined,
     vma: *VmaAllocator = undefined,
+    bindless: ?*Bindless = undefined,
+
+    allocation: c.VmaAllocation = undefined,
     usage_flags: c.VkBufferUsageFlags = undefined,
+    bindless_id: Bindless.IdentifierType = Bindless.invalid_id,
     size: usize = undefined,
 
     pub fn init(vma: *VmaAllocator, params: struct {
@@ -21,11 +25,13 @@ pub const Buffer = struct {
         memory_usage: c.VmaMemoryUsage = c.VMA_MEMORY_USAGE_AUTO,
         memory_flags: c.VmaPoolCreateFlags = 0,
         memory_priority: f32 = 0.0,
+        bindless: ?*Bindless = null,
     }) !Buffer {
         var self = Buffer{};
         errdefer self.deinit();
 
         self.vma = vma;
+        self.bindless = params.bindless;
         self.usage_flags = params.usage_flags;
         self.size = params.size;
 
@@ -57,6 +63,17 @@ pub const Buffer = struct {
             return error.FailedToCreateBuffer;
         };
 
+        if (params.bindless != null) {
+            if (params.usage_flags & c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT != 0) {
+                self.bindless_id = params.bindless.?.registerUniformBuffer(&self);
+            } else {
+                log.err("Bindless resource not supported for this buffer usage", .{});
+                return error.UnsupportedBindlessBufferUsage;
+            }
+
+            std.debug.assert(self.bindless_id != Bindless.invalid_id);
+        }
+
         var buffer_name: [:0]const u8 = undefined;
         if (params.usage_flags & c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT != 0) {
             buffer_name = "staging buffer";
@@ -75,9 +92,16 @@ pub const Buffer = struct {
     }
 
     pub fn deinit(self: *Buffer) void {
+        if (self.bindless_id != Bindless.invalid_id) {
+            if (self.usage_flags & c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT != 0) {
+                self.bindless.?.unregisterUniformBuffer(self.bindless_id);
+            }
+        }
+
         if (self.handle != null) {
             c.vmaDestroyBuffer(self.vma.handle, self.handle, self.allocation);
         }
+
         self.* = undefined;
     }
 

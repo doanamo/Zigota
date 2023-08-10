@@ -171,9 +171,22 @@ pub const Device = struct {
             .dynamicRendering = c.VK_TRUE,
         };
 
+        var descriptor_indexing_features = std.mem.zeroInit(c.VkPhysicalDeviceDescriptorIndexingFeatures, .{
+            .sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES,
+            .pNext = &dynamic_rendering_features,
+            .shaderSampledImageArrayNonUniformIndexing = c.VK_TRUE,
+            .shaderUniformBufferArrayNonUniformIndexing = c.VK_TRUE,
+            .shaderStorageBufferArrayNonUniformIndexing = c.VK_TRUE,
+            .descriptorBindingSampledImageUpdateAfterBind = c.VK_TRUE,
+            .descriptorBindingUniformBufferUpdateAfterBind = c.VK_TRUE,
+            .descriptorBindingStorageBufferUpdateAfterBind = c.VK_TRUE,
+            .descriptorBindingPartiallyBound = c.VK_TRUE,
+            .runtimeDescriptorArray = c.VK_TRUE,
+        });
+
         var synchronization_features = c.VkPhysicalDeviceSynchronization2Features{
             .sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES,
-            .pNext = &dynamic_rendering_features,
+            .pNext = &descriptor_indexing_features,
             .synchronization2 = c.VK_TRUE,
         };
 

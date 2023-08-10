@@ -8,6 +8,7 @@ const check = utility.vulkanCheckResult;
 
 const Device = @import("device.zig").Device;
 const VmaAllocator = @import("vma.zig").VmaAllocator;
+const Bindless = @import("bindless.zig").Bindless;
 const CommandPool = @import("command_pool.zig").CommandPool;
 const CommandBuffer = @import("command_buffer.zig").CommandBuffer;
 const Buffer = @import("buffer.zig").Buffer;
@@ -26,6 +27,7 @@ pub const Transfer = struct {
 
     device: *Device = undefined,
     vma: *VmaAllocator = undefined,
+    bindless: *Bindless = undefined,
 
     command_pool: CommandPool = .{},
     command_buffer: CommandBuffer = .{},
@@ -38,7 +40,7 @@ pub const Transfer = struct {
     finished_semaphore: c.VkSemaphore = null,
     finished_semaphore_index: u64 = 0,
 
-    pub fn init(device: *Device, vma: *VmaAllocator) !Transfer {
+    pub fn init(device: *Device, vma: *VmaAllocator, bindless: *Bindless) !Transfer {
         log.info("Initializing transfer queue...", .{});
 
         var self = Transfer{};
@@ -46,6 +48,7 @@ pub const Transfer = struct {
 
         self.device = device;
         self.vma = vma;
+        self.bindless = bindless;
 
         self.createCommandPool() catch |err| {
             log.err("Failed to create transfer command pool: {}", .{err});

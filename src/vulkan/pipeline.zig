@@ -8,6 +8,7 @@ const check = utility.vulkanCheckResult;
 
 const Device = @import("device.zig").Device;
 const Swapchain = @import("swapchain.zig").Swapchain;
+const Bindless = @import("bindless.zig").Bindless;
 const ShaderStage = @import("shader_module.zig").ShaderStage;
 const ShaderModule = @import("shader_module.zig").ShaderModule;
 const VertexAttributeType = vertex_attributes.VertexAttributeType;
@@ -20,6 +21,7 @@ pub const PipelineBuilder = struct {
     };
 
     device: *Device = undefined,
+    bindless: *Bindless = undefined,
     shader_stages: std.ArrayListUnmanaged(ShaderStageEntry) = .{},
     shader_stages_mask: c.VkShaderStageFlagBits = 0,
     shader_stage_create_infos: std.ArrayListUnmanaged(c.VkPipelineShaderStageCreateInfo) = .{},
@@ -31,13 +33,14 @@ pub const PipelineBuilder = struct {
     depth_test_enable: bool = true,
     depth_write_enable: bool = true,
     stencil_test_enable: bool = false,
-    pipeline_layout: c.VkPipelineLayout = null,
 
-    pub fn init(device: *Device) !PipelineBuilder {
+    pub fn init(device: *Device, bindless: *Bindless) !PipelineBuilder {
         var self = PipelineBuilder{};
         errdefer self.deinit();
 
         self.device = device;
+        self.bindless = bindless;
+
         try self.shader_stages.ensureTotalCapacityPrecise(memory.frame_allocator, shader_stage_count);
         try self.shader_stage_create_infos.ensureTotalCapacityPrecise(memory.frame_allocator, shader_stage_count);
 
@@ -128,10 +131,6 @@ pub const PipelineBuilder = struct {
 
     pub fn setStencilTest(self: *PipelineBuilder, test_enable: bool) void {
         self.stencil_test_enable = test_enable;
-    }
-
-    pub fn setPipelineLayout(self: *PipelineBuilder, pipeline_layout: c.VkPipelineLayout) void {
-        self.pipeline_layout = pipeline_layout;
     }
 
     pub fn build(self: *PipelineBuilder) !Pipeline {
@@ -282,7 +281,7 @@ pub const PipelineBuilder = struct {
             .pDepthStencilState = &depth_stencil_state_create_info,
             .pColorBlendState = &color_blend_state_create_info,
             .pDynamicState = &dynamic_state_create_info,
-            .layout = self.pipeline_layout,
+            .layout = self.bindless.pipeline_layout,
             .renderPass = null,
             .subpass = 0,
             .basePipelineHandle = null,

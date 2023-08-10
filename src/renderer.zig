@@ -24,14 +24,9 @@ pub const Renderer = struct {
         command_pool: CommandPool = .{},
         command_buffer: CommandBuffer = .{},
         uniform_buffer: Buffer = .{},
-        descriptor_set: c.VkDescriptorSet = null,
     };
 
     vulkan: Vulkan = .{},
-
-    descriptor_pool: DescriptorPool = .{},
-    descriptor_set_layout: c.VkDescriptorSetLayout = null,
-    pipeline_layout: c.VkPipelineLayout = null,
     pipeline: Pipeline = .{},
     frames: std.ArrayListUnmanaged(Frame) = .{},
 
@@ -47,16 +42,6 @@ pub const Renderer = struct {
         self.vulkan = Vulkan.init(window) catch |err| {
             log.err("Failed to initialize Vulkan: {}", .{err});
             return error.FailedToInitializeVulkan;
-        };
-
-        self.createDescriptors() catch |err| {
-            log.err("Failed to create descriptors: {}", .{err});
-            return error.FailedToCreateDescriptors;
-        };
-
-        self.createLayouts() catch |err| {
-            log.err("Failed to create layouts: {}", .{err});
-            return error.FailedToCreateLayouts;
         };
 
         self.createPipeline() catch |err| {
@@ -84,8 +69,6 @@ pub const Renderer = struct {
         self.destroyAssets();
         self.destroyFrames();
         self.destroyPipeline();
-        self.destroyLayouts();
-        self.destroyDescriptors();
         self.vulkan.deinit();
     }
 
@@ -93,80 +76,14 @@ pub const Renderer = struct {
         try self.vulkan.recreateSwapchain();
     }
 
-    fn createDescriptors(self: *Renderer) !void {
-        log.info("Creating descriptors...", .{});
-
-        var swapchain = &self.vulkan.heap.?.swapchain;
-        var device = &self.vulkan.heap.?.device;
-
-        self.descriptor_pool = try DescriptorPool.init(device, .{
-            .max_set_count = swapchain.max_inflight_frames,
-            .pool_sizes = &[_]c.VkDescriptorPoolSize{
-                .{
-                    .type = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                    .descriptorCount = swapchain.max_inflight_frames,
-                },
-            },
-        });
-    }
-
-    fn destroyDescriptors(self: *Renderer) void {
-        self.descriptor_pool.deinit();
-    }
-
-    fn createLayouts(self: *Renderer) !void {
-        log.info("Create layouts...", .{});
-
-        var device = &self.vulkan.heap.?.device;
-
-        const descriptor_set_layout_binding = c.VkDescriptorSetLayoutBinding{
-            .binding = 0,
-            .descriptorType = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = 1,
-            .stageFlags = c.VK_SHADER_STAGE_VERTEX_BIT,
-            .pImmutableSamplers = null,
-        };
-
-        const descriptor_set_layout_create_info = c.VkDescriptorSetLayoutCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .pNext = null,
-            .flags = 0,
-            .bindingCount = 1,
-            .pBindings = &descriptor_set_layout_binding,
-        };
-
-        try check(c.vkCreateDescriptorSetLayout.?(device.handle, &descriptor_set_layout_create_info, memory.vulkan_allocator, &self.descriptor_set_layout));
-
-        const pipeline_layout_create_info = c.VkPipelineLayoutCreateInfo{
-            .sType = c.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-            .pNext = null,
-            .flags = 0,
-            .setLayoutCount = 1,
-            .pSetLayouts = &self.descriptor_set_layout,
-            .pushConstantRangeCount = 0,
-            .pPushConstantRanges = null,
-        };
-
-        try check(c.vkCreatePipelineLayout.?(device.handle, &pipeline_layout_create_info, memory.vulkan_allocator, &self.pipeline_layout));
-    }
-
-    fn destroyLayouts(self: *Renderer) void {
-        if (self.pipeline_layout != null) {
-            c.vkDestroyPipelineLayout.?(self.vulkan.heap.?.device.handle, self.pipeline_layout, memory.vulkan_allocator);
-        }
-
-        if (self.descriptor_set_layout != null) {
-            c.vkDestroyDescriptorSetLayout.?(self.vulkan.heap.?.device.handle, self.descriptor_set_layout, memory.vulkan_allocator);
-        }
-    }
-
     fn createPipeline(self: *Renderer) !void {
         log.info("Creating pipeline...", .{});
 
         const device = &self.vulkan.heap.?.device;
         const swapchain = &self.vulkan.heap.?.swapchain;
+        const bindless = &self.vulkan.heap.?.bindless;
 
-        var builder = try PipelineBuilder.init(device);
+        var builder = try PipelineBuilder.init(device, bindless);
         defer builder.deinit();
 
         try builder.loadShaderModule(.Vertex, "data/shaders/simple.vert.spv");
@@ -177,7 +94,6 @@ pub const Renderer = struct {
         try builder.addVertexAttribute(.Color, false);
 
         builder.setSwapchainAttachmentFormats(swapchain);
-        builder.setPipelineLayout(self.pipeline_layout);
 
         self.pipeline = try builder.build();
     }
@@ -192,6 +108,7 @@ pub const Renderer = struct {
         var device = &self.vulkan.heap.?.device;
         var swapchain = &self.vulkan.heap.?.swapchain;
         var vma = &self.vulkan.heap.?.vma;
+        var bindless = &self.vulkan.heap.?.bindless;
 
         try self.frames.ensureTotalCapacityPrecise(memory.default_allocator, swapchain.max_inflight_frames);
         for (0..swapchain.max_inflight_frames) |_| {
@@ -206,52 +123,19 @@ pub const Renderer = struct {
                 .size = @sizeOf(VertexTransformUniform),
                 .usage_flags = c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 .memory_flags = c.VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | c.VMA_ALLOCATION_CREATE_MAPPED_BIT,
+                .bindless = bindless,
             });
-
-            const descriptor_set_allocate_info = c.VkDescriptorSetAllocateInfo{
-                .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-                .pNext = null,
-                .descriptorPool = self.descriptor_pool.handle,
-                .descriptorSetCount = 1,
-                .pSetLayouts = &self.descriptor_set_layout,
-            };
-
-            var descriptor_set: c.VkDescriptorSet = undefined;
-            try check(c.vkAllocateDescriptorSets.?(device.handle, &descriptor_set_allocate_info, &descriptor_set));
-
-            const uniform_buffer_info = c.VkDescriptorBufferInfo{
-                .buffer = uniform_buffer.handle,
-                .offset = 0,
-                .range = @sizeOf(VertexTransformUniform),
-            };
-
-            const write_descriptor_set = c.VkWriteDescriptorSet{
-                .sType = c.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .pNext = null,
-                .dstSet = descriptor_set,
-                .dstBinding = 0,
-                .dstArrayElement = 0,
-                .descriptorCount = 1,
-                .descriptorType = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .pImageInfo = null,
-                .pBufferInfo = &uniform_buffer_info,
-                .pTexelBufferView = null,
-            };
-
-            c.vkUpdateDescriptorSets.?(device.handle, 1, &write_descriptor_set, 0, null);
 
             try self.frames.append(memory.default_allocator, .{
                 .command_pool = command_pool,
                 .command_buffer = command_buffer,
                 .uniform_buffer = uniform_buffer,
-                .descriptor_set = descriptor_set,
             });
         }
     }
 
     fn destroyFrames(self: *Renderer) void {
         for (self.frames.items) |*frame| {
-            // Descriptor sets are cleaned up automatically.
             frame.uniform_buffer.deinit();
             frame.command_buffer.deinit(&self.vulkan.heap.?.device, &frame.command_pool);
             frame.command_pool.deinit();
@@ -295,9 +179,14 @@ pub const Renderer = struct {
         try uniform_buffer.flush(0, c.VK_WHOLE_SIZE);
     }
 
-    fn recordCommandBuffer(self: *Renderer, command_buffer: *CommandBuffer, descriptor_set: c.VkDescriptorSet, image_index: u32) !void {
+    fn recordCommandBuffer(self: *Renderer, frame: *Frame, image_index: u32) !void {
         const transfer = &self.vulkan.heap.?.transfer;
         const swapchain = &self.vulkan.heap.?.swapchain;
+        const bindless = &self.vulkan.heap.?.bindless;
+
+        try frame.command_pool.reset();
+        var command_buffer = &frame.command_buffer;
+        var uniform_buffer = &frame.uniform_buffer;
 
         try check(c.vkBeginCommandBuffer.?(command_buffer.handle, &c.VkCommandBufferBeginInfo{
             .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -365,7 +254,14 @@ pub const Renderer = struct {
 
         c.vkCmdBeginRendering.?(command_buffer.handle, &rendering_info);
         c.vkCmdBindPipeline.?(command_buffer.handle, c.VK_PIPELINE_BIND_POINT_GRAPHICS, self.pipeline.handle);
-        c.vkCmdBindDescriptorSets.?(command_buffer.handle, c.VK_PIPELINE_BIND_POINT_GRAPHICS, self.pipeline_layout, 0, 1, &descriptor_set, 0, null);
+
+        c.vkCmdBindDescriptorSets.?(command_buffer.handle, c.VK_PIPELINE_BIND_POINT_GRAPHICS, bindless.pipeline_layout, 0, 1, &bindless.descriptor_set, 0, null);
+
+        const push_constants = .{
+            .uniform_buffer_id = uniform_buffer.bindless_id,
+        };
+
+        c.vkCmdPushConstants.?(command_buffer.handle, bindless.pipeline_layout, c.VK_SHADER_STAGE_ALL, 0, @sizeOf(@TypeOf(push_constants)), &push_constants);
 
         c.vkCmdSetViewport.?(command_buffer.handle, 0, 1, &c.VkViewport{
             .x = 0.0,
@@ -403,11 +299,13 @@ pub const Renderer = struct {
     }
 
     pub fn render(self: *Renderer) !void {
+        var device = &self.vulkan.heap.?.device;
         var transfer = &self.vulkan.heap.?.transfer;
         var swapchain = &self.vulkan.heap.?.swapchain;
-        var device = &self.vulkan.heap.?.device;
+        var bindless = &self.vulkan.heap.?.bindless;
 
         try transfer.submit();
+        bindless.updateDescriptorSet();
 
         const image_next = swapchain.acquireNextImage() catch |err| {
             if (err == error.SwapchainOutOfDate) {
@@ -420,9 +318,8 @@ pub const Renderer = struct {
         const frame_index = swapchain.frame_index;
         var frame = &self.frames.items[frame_index];
 
-        try frame.command_pool.reset();
         try self.updateUniformBuffer(&frame.uniform_buffer);
-        try self.recordCommandBuffer(&frame.command_buffer, frame.descriptor_set, image_next.index);
+        try self.recordCommandBuffer(frame, image_next.index);
 
         const submit_wait_semaphores = [_]c.VkSemaphore{
             transfer.finished_semaphore,

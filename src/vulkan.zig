@@ -12,6 +12,7 @@ const Device = @import("vulkan/device.zig").Device;
 const Swapchain = @import("vulkan/swapchain.zig").Swapchain;
 const VmaAllocator = @import("vulkan/vma.zig").VmaAllocator;
 const Transfer = @import("vulkan/transfer.zig").Transfer;
+const Bindless = @import("vulkan/bindless.zig").Bindless;
 
 pub const Vulkan = struct {
     pub const Config = struct {
@@ -26,6 +27,7 @@ pub const Vulkan = struct {
         device: Device = .{},
         vma: VmaAllocator = .{},
         swapchain: Swapchain = .{},
+        bindless: Bindless = .{},
         transfer: Transfer = .{},
     };
 
@@ -71,7 +73,12 @@ pub const Vulkan = struct {
             return error.FailedToInitializeSwapchain;
         };
 
-        heap.transfer = Transfer.init(&heap.device, &heap.vma) catch |err| {
+        heap.bindless = Bindless.init(&heap.device) catch |err| {
+            log.err("Failed to initialize bindless: {}", .{err});
+            return error.FailedToInitializeBindless;
+        };
+
+        heap.transfer = Transfer.init(&heap.device, &heap.vma, &heap.bindless) catch |err| {
             log.err("Failed to initialize transfer: {}", .{err});
             return error.FailedToInitializeTransfer;
         };
@@ -84,7 +91,9 @@ pub const Vulkan = struct {
 
         if (self.heap) |heap| {
             heap.device.waitIdle();
+
             heap.transfer.deinit();
+            heap.bindless.deinit();
             heap.swapchain.deinit();
             heap.vma.deinit();
             heap.device.deinit();
