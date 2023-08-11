@@ -74,20 +74,7 @@ pub const Buffer = struct {
             std.debug.assert(self.bindless_id != Bindless.invalid_id);
         }
 
-        var buffer_name: [:0]const u8 = undefined;
-        if (params.usage_flags & c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT != 0) {
-            buffer_name = "staging buffer";
-        } else if (params.usage_flags & c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT != 0) {
-            buffer_name = "vertex buffer";
-        } else if (params.usage_flags & c.VK_BUFFER_USAGE_INDEX_BUFFER_BIT != 0) {
-            buffer_name = "index buffer";
-        } else if (params.usage_flags & c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT != 0) {
-            buffer_name = "uniform buffer";
-        } else {
-            buffer_name = "buffer";
-        }
-
-        log.info("Created {s} ({} bytes)", .{ buffer_name, params.size });
+        log.info("Created {s} ({} bytes)", .{ self.getName(), params.size });
         return self;
     }
 
@@ -132,5 +119,19 @@ pub const Buffer = struct {
         std.debug.assert(self.vma.handle != null);
         std.debug.assert(self.allocation != null);
         try check(c.vmaFlushAllocation(self.vma.handle, self.allocation, offset, size));
+    }
+
+    pub fn getName(self: *Buffer) []const u8 {
+        if (self.usage_flags & c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT != 0) {
+            return "staging buffer";
+        } else if (self.usage_flags & c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT != 0) {
+            return "vertex buffer";
+        } else if (self.usage_flags & c.VK_BUFFER_USAGE_INDEX_BUFFER_BIT != 0) {
+            return "index buffer";
+        } else if (self.usage_flags & c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT != 0) {
+            return "uniform buffer";
+        } else {
+            return "buffer";
+        }
     }
 };
