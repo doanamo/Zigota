@@ -106,6 +106,18 @@ pub const Vulkan = struct {
         self.* = undefined;
     }
 
+    pub fn get(self: *Vulkan, comptime T: type) *T {
+        std.debug.assert(self.heap != null);
+
+        inline for (@typeInfo(Heap).Struct.fields) |field| {
+            if (field.type == T) {
+                return &@field(self.heap.?, field.name);
+            }
+        } else {
+            @compileError("Vulkan object does not contain field of type '" ++ @typeName(@TypeOf(T)) ++ "'");
+        }
+    }
+
     pub fn recreateSwapchain(self: *Vulkan) !void {
         self.heap.?.device.waitIdle();
         try self.heap.?.swapchain.recreate();
