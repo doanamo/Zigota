@@ -12,11 +12,10 @@ pub const CommandPool = struct {
     handle: c.VkCommandPool = null,
     device: *Device = undefined,
 
-    pub fn init(device: *Device, params: struct {
+    pub fn init(self: *CommandPool, device: *Device, params: struct {
         queue: Device.QueueType,
         flags: c.VkCommandPoolCreateFlags = 0,
-    }) !CommandPool {
-        var self = CommandPool{};
+    }) !void {
         errdefer self.deinit();
 
         self.device = device;
@@ -32,22 +31,13 @@ pub const CommandPool = struct {
             log.err("Failed to create command pool: {}", .{err});
             return error.FailedToCreateCommandPool;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *CommandPool) void {
         if (self.handle != null) {
             c.vkDestroyCommandPool.?(self.device.handle, self.handle, memory.vulkan_allocator);
         }
-        self.* = undefined;
-    }
-
-    pub fn createBuffer(self: *CommandPool, level: c.VkCommandBufferLevel) !CommandBuffer {
-        return try CommandBuffer.init(self.device, .{
-            .command_pool = self,
-            .level = level,
-        });
+        self.* = .{};
     }
 
     pub fn reset(self: *CommandPool) !void {

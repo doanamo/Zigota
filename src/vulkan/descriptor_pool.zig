@@ -11,12 +11,11 @@ pub const DescriptorPool = struct {
     handle: c.VkDescriptorPool = null,
     device: *Device = undefined,
 
-    pub fn init(device: *Device, params: struct {
+    pub fn init(self: *DescriptorPool, device: *Device, params: struct {
         max_set_count: u32,
         pool_sizes: []const c.VkDescriptorPoolSize,
         flags: c.VkDescriptorPoolCreateFlags = 0,
-    }) !DescriptorPool {
-        var self = DescriptorPool{};
+    }) !void {
         errdefer self.deinit();
 
         self.device = device;
@@ -34,14 +33,12 @@ pub const DescriptorPool = struct {
             log.err("Failed to create descriptor pool: {}", .{err});
             return error.FailedToCreateDescriptorPool;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *DescriptorPool) void {
         if (self.handle != null) {
             c.vkDestroyDescriptorPool.?(self.device.handle, self.handle, memory.vulkan_allocator);
         }
-        self.* = undefined;
+        self.* = .{};
     }
 };

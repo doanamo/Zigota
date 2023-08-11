@@ -47,8 +47,7 @@ pub const Swapchain = struct {
     frame_inflight_fences: std.ArrayListUnmanaged(c.VkFence) = .{},
     frame_index: u32 = 0,
 
-    pub fn init(window: *Window, surface: *Surface, device: *Device, vma: *VmaAllocator) !Swapchain {
-        var self = Swapchain{};
+    pub fn init(self: *Swapchain, window: *Window, surface: *Surface, device: *Device, vma: *VmaAllocator) !void {
         errdefer self.deinit();
 
         self.window = window;
@@ -75,8 +74,6 @@ pub const Swapchain = struct {
             log.err("Failed to create image synchronization: {}", .{err});
             return error.FailedToCreateImageSynchronization;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *Swapchain) void {
@@ -84,20 +81,18 @@ pub const Swapchain = struct {
         self.destroyDepthStencilBuffer(false);
         self.destroyImageViews(false);
         self.destroySwapchain();
-        self.* = undefined;
+        self.* = .{};
     }
 
     fn createSwapchain(self: *Swapchain) !void {
         // Simplified surface format and present mode selection
         // Hardcoded swapchain preferences with most common support across most platforms
         log.info("Creating swapchain...", .{});
-        errdefer self.destroySwapchain();
-
         const config = root.config.vulkan.swapchain;
 
         self.extent = c.VkExtent2D{
-            .width = self.window.getWidth(),
-            .height = self.window.getHeight(),
+            .width = self.window.width,
+            .height = self.window.height,
         };
 
         self.image_format = c.VK_FORMAT_B8G8R8A8_SRGB;
@@ -204,7 +199,7 @@ pub const Swapchain = struct {
         errdefer self.destroyDepthStencilBuffer(recreating);
 
         self.depth_stencil_image_format = c.VK_FORMAT_D32_SFLOAT_S8_UINT;
-        self.depth_stencil_image = try Image.init(self.vma, .{
+        try self.depth_stencil_image.init(self.vma, .{
             .format = self.depth_stencil_image_format,
             .extent = .{
                 .width = self.extent.width,

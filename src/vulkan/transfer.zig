@@ -40,10 +40,8 @@ pub const Transfer = struct {
     finished_semaphore: c.VkSemaphore = null,
     finished_semaphore_index: u64 = 0,
 
-    pub fn init(device: *Device, vma: *VmaAllocator, bindless: *Bindless) !Transfer {
+    pub fn init(self: *Transfer, device: *Device, vma: *VmaAllocator, bindless: *Bindless) !void {
         log.info("Initializing transfer queue...", .{});
-
-        var self = Transfer{};
         errdefer self.deinit();
 
         self.device = device;
@@ -64,26 +62,24 @@ pub const Transfer = struct {
             log.err("Failed to create transfer synchronization: {}", .{err});
             return error.FailedToCreateSynchronization;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *Transfer) void {
         self.destroySynchronization();
         self.destroyStagingBuffer();
         self.destroyCommandPool();
-        self.* = undefined;
+        self.* = .{};
     }
 
     fn createCommandPool(self: *Transfer) !void {
         log.info("Creating transfer command pool", .{});
 
-        self.command_pool = try CommandPool.init(self.device, .{
+        try self.command_pool.init(self.device, .{
             .queue = .Transfer,
             .flags = c.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
         });
 
-        self.command_buffer = try CommandBuffer.init(self.device, .{
+        try self.command_buffer.init(self.device, .{
             .command_pool = &self.command_pool,
             .level = c.VK_COMMAND_BUFFER_LEVEL_PRIMARY,
         });
@@ -100,7 +96,7 @@ pub const Transfer = struct {
         const config = root.config.vulkan.transfer;
         self.staging_size = utility.fromKilobytes(config.staging_size_kb);
 
-        self.staging_buffer = try Buffer.init(self.vma, .{
+        try self.staging_buffer.init(self.vma, .{
             .size = self.staging_size,
             .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             .memory_flags = c.VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | c.VMA_ALLOCATION_CREATE_MAPPED_BIT,

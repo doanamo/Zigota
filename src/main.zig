@@ -29,20 +29,19 @@ pub fn main() !void {
     defer glfw.deinit();
 
     // Load config
-    config = try Config.init();
+    try config.load();
 
     // Create application
-    var application = try Application.init();
+    var application = Application{};
     defer application.deinit();
-
-    var window = &application.heap.?.window;
+    try application.init();
 
     // Main loop
     log.info("Starting main loop...", .{});
-    window.show();
+    application.window.show();
 
     var timer = try std.time.Timer.start();
-    while (!window.shouldClose()) {
+    while (!application.window.shouldClose()) {
         glfw.pollEvents();
 
         const time_delta: f32 = @floatCast(@as(f64, @floatFromInt(timer.lap())) / @as(f64, @floatFromInt(std.time.ns_per_s)));
@@ -53,5 +52,6 @@ pub fn main() !void {
         _ = memory.frame_arena_allocator.reset(.retain_capacity);
     }
 
+    // Exit
     log.info("Exiting application...", .{});
 }

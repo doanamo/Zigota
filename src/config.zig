@@ -12,7 +12,7 @@ pub const Config = struct {
     window: WindowConfig = undefined,
     vulkan: VulkanConfig = undefined,
 
-    pub fn init() !Config {
+    pub fn load(self: *Config) !void {
         const content = std.fs.cwd().readFileAllocOptions(
             memory.default_allocator,
             path,
@@ -31,8 +31,8 @@ pub const Config = struct {
             return error.FailedToParseConfigFile;
         };
         defer parsed.deinit();
+        self.* = parsed.value;
 
         log.info("Loaded config from \"{s}\" file", .{path});
-        return parsed.value;
     }
 };

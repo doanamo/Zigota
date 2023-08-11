@@ -9,10 +9,11 @@ const VmaAllocator = @import("vma.zig").VmaAllocator;
 
 pub const Image = struct {
     handle: c.VkImage = null,
-    allocation: c.VmaAllocation = undefined,
     vma: *VmaAllocator = undefined,
+    allocation: c.VmaAllocation = undefined,
+    usage_flags: c.VkImageUsageFlags = 0,
 
-    pub fn init(vma: *VmaAllocator, params: struct {
+    pub fn init(self: *Image, vma: *VmaAllocator, params: struct {
         format: c.VkFormat,
         extent: c.VkExtent3D,
         usage_flags: c.VkImageUsageFlags,
@@ -23,11 +24,11 @@ pub const Image = struct {
         memory_usage: c.VmaMemoryUsage = c.VMA_MEMORY_USAGE_AUTO,
         memory_flags: c.VmaPoolCreateFlags = 0,
         memory_priority: f32 = 0.0,
-    }) !Image {
-        var self = Image{};
+    }) !void {
         errdefer self.deinit();
 
         self.vma = vma;
+        self.usage_flags = params.usage_flags;
 
         const image_create_info = c.VkImageCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -64,27 +65,27 @@ pub const Image = struct {
             return error.FailedToCreateImage;
         };
 
-        var image_name: [:0]const u8 = undefined;
-        if (params.usage_flags & c.VK_IMAGE_USAGE_TRANSFER_SRC_BIT != 0) {
-            image_name = "staging image";
-        } else if (params.usage_flags & c.VK_IMAGE_USAGE_SAMPLED_BIT != 0) {
-            image_name = "sampled image";
-        } else if (params.usage_flags & c.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT != 0) {
-            image_name = "color attachment image";
-        } else if (params.usage_flags & c.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT != 0) {
-            image_name = "depth stencil attachment image";
-        } else {
-            image_name = "image";
-        }
-
-        log.info("Created {s} ({} bytes)", .{ image_name, allocation_info.size });
-        return self;
+        log.info("Created {s} ({} bytes)", .{ self.getName(), allocation_info.size });
     }
 
     pub fn deinit(self: *Image) void {
         if (self.handle != null) {
             c.vmaDestroyImage(self.vma.handle, self.handle, self.allocation);
         }
-        self.* = undefined;
+        self.* = .{};
+    }
+
+    pub fn getName(self: *Image) []const u8 {
+        if (self.usage_flags & c.VK_IMAGE_USAGE_TRANSFER_SRC_BIT != 0) {
+            return "staging image";
+        } else if (self.usage_flags & c.VK_IMAGE_USAGE_SAMPLED_BIT != 0) {
+            return "sampled image";
+        } else if (self.usage_flags & c.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT != 0) {
+            return "color attachment image";
+        } else if (self.usage_flags & c.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT != 0) {
+            return "depth stencil attachment image";
+        } else {
+            return "image";
+        }
     }
 };

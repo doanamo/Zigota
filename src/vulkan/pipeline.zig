@@ -34,8 +34,7 @@ pub const PipelineBuilder = struct {
     depth_write_enable: bool = true,
     stencil_test_enable: bool = false,
 
-    pub fn init(device: *Device, bindless: *Bindless) !PipelineBuilder {
-        var self = PipelineBuilder{};
+    pub fn init(self: *PipelineBuilder, device: *Device, bindless: *Bindless) !void {
         errdefer self.deinit();
 
         self.device = device;
@@ -43,22 +42,22 @@ pub const PipelineBuilder = struct {
 
         try self.shader_stages.ensureTotalCapacityPrecise(memory.frame_allocator, shader_stage_count);
         try self.shader_stage_create_infos.ensureTotalCapacityPrecise(memory.frame_allocator, shader_stage_count);
-
-        return self;
     }
 
     pub fn deinit(self: *PipelineBuilder) void {
         for (self.shader_stages.items) |*shader_stage| {
             shader_stage.module.deinit();
         }
-        self.shader_stages.deinit(memory.frame_allocator);
 
+        self.shader_stages.deinit(memory.frame_allocator);
         self.vertex_binding_descriptions.deinit(memory.frame_allocator);
         self.vertex_attribute_descriptions.deinit(memory.frame_allocator);
+        self.* = .{};
     }
 
     pub fn loadShaderModule(self: *PipelineBuilder, shader_stage: ShaderStage, path: []const u8) !void {
-        var shader_module = try ShaderModule.loadFromFile(self.device, path);
+        var shader_module = ShaderModule{};
+        try shader_module.loadFromFile(self.device, path);
         errdefer shader_module.deinit();
 
         const shader_stage_flag = @intFromEnum(shader_stage);

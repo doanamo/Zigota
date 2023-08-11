@@ -33,13 +33,11 @@ pub const Renderer = struct {
     mesh: Mesh = .{},
     time: f32 = 0.0,
 
-    pub fn init(window: *Window) !Renderer {
+    pub fn init(self: *Renderer, window: *Window) !void {
         log.info("Initializing...", .{});
-
-        var self = Renderer{};
         errdefer self.deinit();
 
-        self.vulkan = Vulkan.init(window) catch |err| {
+        self.vulkan.init(window) catch |err| {
             log.err("Failed to initialize Vulkan: {}", .{err});
             return error.FailedToInitializeVulkan;
         };
@@ -58,18 +56,17 @@ pub const Renderer = struct {
             log.err("Failed to create mesh: {}", .{err});
             return error.FailedToCreateMesh;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *Renderer) void {
         log.info("Deinitializing...", .{});
 
-        self.vulkan.waitIdle();
+        self.vulkan.device.waitIdle();
         self.destroyAssets();
         self.destroyFrames();
         self.destroyPipeline();
         self.vulkan.deinit();
+        self.* = .{};
     }
 
     pub fn recreateSwapchain(self: *Renderer) !void {
@@ -79,11 +76,8 @@ pub const Renderer = struct {
     fn createPipeline(self: *Renderer) !void {
         log.info("Creating pipeline...", .{});
 
-        const device = &self.vulkan.heap.?.device;
-        const swapchain = &self.vulkan.heap.?.swapchain;
-        const bindless = &self.vulkan.heap.?.bindless;
-
-        var builder = try PipelineBuilder.init(device, bindless);
+        var builder = PipelineBuilder{};
+        try builder.init(&self.vulkan.device, &self.vulkan.bindless);
         defer builder.deinit();
 
         try builder.loadShaderModule(.Vertex, "data/shaders/simple.vert.spv");
@@ -93,7 +87,7 @@ pub const Renderer = struct {
         try builder.addVertexAttribute(.Normal, false);
         try builder.addVertexAttribute(.Color, false);
 
-        builder.setSwapchainAttachmentFormats(swapchain);
+        builder.setSwapchainAttachmentFormats(&self.vulkan.swapchain);
 
         self.pipeline = try builder.build();
     }
@@ -105,26 +99,30 @@ pub const Renderer = struct {
     fn createFrames(self: *Renderer) !void {
         log.info("Creating frames...", .{});
 
-        var device = &self.vulkan.heap.?.device;
-        var swapchain = &self.vulkan.heap.?.swapchain;
-        var vma = &self.vulkan.heap.?.vma;
-        var bindless = &self.vulkan.heap.?.bindless;
-
-        try self.frames.ensureTotalCapacityPrecise(memory.default_allocator, swapchain.max_inflight_frames);
-        for (0..swapchain.max_inflight_frames) |_| {
-            var command_pool = try CommandPool.init(device, .{
+        try self.frames.ensureTotalCapacityPrecise(memory.default_allocator, self.vulkan.swapchain.max_inflight_frames);
+        for (0..self.vulkan.swapchain.max_inflight_frames) |_| {
+            var command_pool = CommandPool{};
+            try command_pool.init(&self.vulkan.device, .{
                 .queue = .Graphics,
                 .flags = c.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
             });
+            errdefer command_pool.deinit();
 
-            var command_buffer = try command_pool.createBuffer(c.VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+            var command_buffer = CommandBuffer{};
+            try command_buffer.init(&self.vulkan.device, .{
+                .command_pool = &command_pool,
+                .level = c.VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+            });
+            errdefer command_buffer.deinit(&self.vulkan.device, &command_pool);
 
-            var uniform_buffer = try Buffer.init(vma, .{
+            var uniform_buffer = Buffer{};
+            try uniform_buffer.init(&self.vulkan.vma, .{
                 .size = @sizeOf(VertexTransformUniform),
                 .usage_flags = c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 .memory_flags = c.VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | c.VMA_ALLOCATION_CREATE_MAPPED_BIT,
-                .bindless = bindless,
+                .bindless = &self.vulkan.bindless,
             });
+            errdefer uniform_buffer.deinit();
 
             try self.frames.append(memory.default_allocator, .{
                 .command_pool = command_pool,
@@ -137,7 +135,7 @@ pub const Renderer = struct {
     fn destroyFrames(self: *Renderer) void {
         for (self.frames.items) |*frame| {
             frame.uniform_buffer.deinit();
-            frame.command_buffer.deinit(&self.vulkan.heap.?.device, &frame.command_pool);
+            frame.command_buffer.deinit(&self.vulkan.device, &frame.command_pool);
             frame.command_pool.deinit();
         }
 
@@ -147,7 +145,7 @@ pub const Renderer = struct {
     fn createAssets(self: *Renderer) !void {
         log.info("Creating mesh...", .{});
 
-        self.mesh = Mesh.init(&self.vulkan.heap.?.transfer, "data/meshes/monkey.bin") catch |err| {
+        self.mesh.init(&self.vulkan.transfer, "data/meshes/monkey.bin") catch |err| {
             log.err("Failed to load mesh ({})", .{err});
             return error.FailedToLoadMesh;
         };
@@ -158,9 +156,9 @@ pub const Renderer = struct {
     }
 
     fn updateUniformBuffer(self: *Renderer, uniform_buffer: *Buffer) !void {
-        const window = self.vulkan.heap.?.swapchain.window;
-        const width: f32 = @floatFromInt(window.getWidth());
-        const height: f32 = @floatFromInt(window.getHeight());
+        const window: *Window = self.vulkan.swapchain.window;
+        const width: f32 = @floatFromInt(window.width);
+        const height: f32 = @floatFromInt(window.height);
 
         const camera_position = math.Vec3{ 0.0, -1.0, 0.5 };
         const camera_target = math.Vec3{ 0.0, 0.0, 0.0 };
@@ -180,10 +178,6 @@ pub const Renderer = struct {
     }
 
     fn recordCommandBuffer(self: *Renderer, frame: *Frame, image_index: u32) !void {
-        const transfer = &self.vulkan.heap.?.transfer;
-        const swapchain = &self.vulkan.heap.?.swapchain;
-        const bindless = &self.vulkan.heap.?.bindless;
-
         try frame.command_pool.reset();
         var command_buffer = &frame.command_buffer;
         var uniform_buffer = &frame.uniform_buffer;
@@ -195,13 +189,13 @@ pub const Renderer = struct {
             .pInheritanceInfo = null,
         }));
 
-        transfer.recordOwnershipTransfers(command_buffer);
-        swapchain.recordLayoutTransitions(command_buffer, image_index);
+        self.vulkan.transfer.recordOwnershipTransfers(command_buffer);
+        self.vulkan.swapchain.recordLayoutTransitions(command_buffer, image_index);
 
         const color_attachment_info = c.VkRenderingAttachmentInfo{
             .sType = c.VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
             .pNext = null,
-            .imageView = swapchain.image_views.items[image_index],
+            .imageView = self.vulkan.swapchain.image_views.items[image_index],
             .imageLayout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .resolveMode = c.VK_RESOLVE_MODE_NONE,
             .resolveImageView = null,
@@ -218,7 +212,7 @@ pub const Renderer = struct {
         const depth_stencil_attachment_info = c.VkRenderingAttachmentInfo{
             .sType = c.VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
             .pNext = null,
-            .imageView = swapchain.depth_stencil_image_view,
+            .imageView = self.vulkan.swapchain.depth_stencil_image_view,
             .imageLayout = c.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
             .resolveMode = c.VK_RESOLVE_MODE_NONE,
             .resolveImageView = null,
@@ -242,7 +236,7 @@ pub const Renderer = struct {
                     .x = 0,
                     .y = 0,
                 },
-                .extent = swapchain.extent,
+                .extent = self.vulkan.swapchain.extent,
             },
             .layerCount = 1,
             .viewMask = 0,
@@ -255,19 +249,19 @@ pub const Renderer = struct {
         c.vkCmdBeginRendering.?(command_buffer.handle, &rendering_info);
         c.vkCmdBindPipeline.?(command_buffer.handle, c.VK_PIPELINE_BIND_POINT_GRAPHICS, self.pipeline.handle);
 
-        c.vkCmdBindDescriptorSets.?(command_buffer.handle, c.VK_PIPELINE_BIND_POINT_GRAPHICS, bindless.pipeline_layout, 0, 1, &bindless.descriptor_set, 0, null);
+        c.vkCmdBindDescriptorSets.?(command_buffer.handle, c.VK_PIPELINE_BIND_POINT_GRAPHICS, self.vulkan.bindless.pipeline_layout, 0, 1, &self.vulkan.bindless.descriptor_set, 0, null);
 
         const push_constants = .{
             .uniform_buffer_id = uniform_buffer.bindless_id,
         };
 
-        c.vkCmdPushConstants.?(command_buffer.handle, bindless.pipeline_layout, c.VK_SHADER_STAGE_ALL, 0, @sizeOf(@TypeOf(push_constants)), &push_constants);
+        c.vkCmdPushConstants.?(command_buffer.handle, self.vulkan.bindless.pipeline_layout, c.VK_SHADER_STAGE_ALL, 0, @sizeOf(@TypeOf(push_constants)), &push_constants);
 
         c.vkCmdSetViewport.?(command_buffer.handle, 0, 1, &c.VkViewport{
             .x = 0.0,
             .y = 0.0,
-            .width = @floatFromInt(swapchain.extent.width),
-            .height = @floatFromInt(swapchain.extent.height),
+            .width = @floatFromInt(self.vulkan.swapchain.extent.width),
+            .height = @floatFromInt(self.vulkan.swapchain.extent.height),
             .minDepth = 0.0,
             .maxDepth = 1.0,
         });
@@ -277,7 +271,7 @@ pub const Renderer = struct {
                 .x = 0,
                 .y = 0,
             },
-            .extent = swapchain.extent,
+            .extent = self.vulkan.swapchain.extent,
         });
 
         var vertex_buffers = [_]c.VkBuffer{undefined} ** vertex_attributes.max_attributes;
@@ -299,15 +293,10 @@ pub const Renderer = struct {
     }
 
     pub fn render(self: *Renderer) !void {
-        var device = &self.vulkan.heap.?.device;
-        var transfer = &self.vulkan.heap.?.transfer;
-        var swapchain = &self.vulkan.heap.?.swapchain;
-        var bindless = &self.vulkan.heap.?.bindless;
+        try self.vulkan.transfer.submit();
+        self.vulkan.bindless.updateDescriptorSet();
 
-        try transfer.submit();
-        bindless.updateDescriptorSet();
-
-        const image_next = swapchain.acquireNextImage() catch |err| {
+        const image_next = self.vulkan.swapchain.acquireNextImage() catch |err| {
             if (err == error.SwapchainOutOfDate) {
                 try self.recreateSwapchain();
                 return;
@@ -315,19 +304,19 @@ pub const Renderer = struct {
             return err;
         };
 
-        const frame_index = swapchain.frame_index;
+        const frame_index = self.vulkan.swapchain.frame_index;
         var frame = &self.frames.items[frame_index];
 
         try self.updateUniformBuffer(&frame.uniform_buffer);
         try self.recordCommandBuffer(frame, image_next.index);
 
         const submit_wait_semaphores = [_]c.VkSemaphore{
-            transfer.finished_semaphore,
+            self.vulkan.transfer.finished_semaphore,
             image_next.available_semaphore,
         };
 
         const submit_wait_sempahore_values = [_]u64{
-            transfer.finished_semaphore_index,
+            self.vulkan.transfer.finished_semaphore_index,
             0,
         };
 
@@ -365,7 +354,7 @@ pub const Renderer = struct {
             .pSignalSemaphores = &submit_signal_semaphores,
         };
 
-        try device.submit(.{
+        try self.vulkan.device.submit(.{
             .queue_type = .Graphics,
             .submit_count = 1,
             .submit_info = &submit_info,
@@ -378,12 +367,12 @@ pub const Renderer = struct {
             .waitSemaphoreCount = submit_signal_semaphores.len,
             .pWaitSemaphores = &submit_signal_semaphores,
             .swapchainCount = 1,
-            .pSwapchains = &swapchain.handle,
+            .pSwapchains = &self.vulkan.swapchain.handle,
             .pImageIndices = &image_next.index,
             .pResults = null,
         };
 
-        swapchain.present(&present_info) catch |err| {
+        self.vulkan.swapchain.present(&present_info) catch |err| {
             if (err == error.SwapchainOutOfDate or err == error.SwapchainSuboptimal) {
                 try self.recreateSwapchain();
                 return;

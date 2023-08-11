@@ -49,23 +49,20 @@ pub const Mesh = struct {
     index_buffer: Buffer = .{},
     index_type_bytes: u8 = undefined,
 
-    pub fn init(transfer: *Transfer, path: []const u8) !Mesh {
-        var self = Mesh{};
+    pub fn init(self: *Mesh, transfer: *Transfer, path: []const u8) !void {
         errdefer self.deinit();
 
         self.loadFromFile(transfer, path) catch |err| {
             log.err("Failed to load mesh from \"{s}\" file: {}", .{ path, err });
             return error.FailedToLoadFromFile;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *Mesh) void {
         self.attribute_offsets.deinit(memory.default_allocator);
         self.vertex_buffer.deinit();
         self.index_buffer.deinit();
-        self.* = undefined;
+        self.* = .{};
     }
 
     fn loadFromFile(self: *Mesh, transfer: *Transfer, path: []const u8) !void {
@@ -87,7 +84,7 @@ pub const Mesh = struct {
             return error.InvalidVerticesHeader;
         } else {
             var current_attribute_offset: usize = 0;
-            self.vertex_buffer = try Buffer.init(transfer.vma, .{
+            try self.vertex_buffer.init(transfer.vma, .{
                 .size = vertices_header.vertex_count * vertices_header.attribute_types.getTotalSize(),
                 .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT | c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
             });
@@ -111,7 +108,7 @@ pub const Mesh = struct {
             return error.InvalidIndicesHeader;
         } else {
             self.index_type_bytes = @intCast(indices_header.index_type_bytes);
-            self.index_buffer = try Buffer.init(transfer.vma, .{
+            try self.index_buffer.init(transfer.vma, .{
                 .size = indices_header.index_count * indices_header.index_type_bytes,
                 .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT | c.VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
             });

@@ -20,112 +20,77 @@ pub const Vulkan = struct {
         transfer: Transfer.Config,
     };
 
-    pub const Heap = struct {
-        instance: Instance = .{},
-        physical_device: PhysicalDevice = .{},
-        surface: Surface = .{},
-        device: Device = .{},
-        vma: VmaAllocator = .{},
-        swapchain: Swapchain = .{},
-        bindless: Bindless = .{},
-        transfer: Transfer = .{},
-    };
+    instance: Instance = .{},
+    physical_device: PhysicalDevice = .{},
+    surface: Surface = .{},
+    device: Device = .{},
+    vma: VmaAllocator = .{},
+    swapchain: Swapchain = .{},
+    bindless: Bindless = .{},
+    transfer: Transfer = .{},
 
-    heap: ?*Heap = null,
-
-    pub fn init(window: *Window) !Vulkan {
+    pub fn init(self: *Vulkan, window: *Window) !void {
         log.info("Initializing...", .{});
-
-        var self = Vulkan{};
         errdefer self.deinit();
 
-        self.heap = try memory.default_allocator.create(Heap);
-        var heap = self.heap orelse unreachable;
-        heap.* = .{};
-
-        heap.instance = Instance.init() catch |err| {
+        self.instance.init() catch |err| {
             log.err("Failed to initialize instance: {}", .{err});
             return error.FailedToInitializeInstance;
         };
 
-        heap.physical_device = PhysicalDevice.init(&heap.instance) catch |err| {
+        self.physical_device.init(&self.instance) catch |err| {
             log.err("Failed to initialize physical device: {}", .{err});
             return error.FailedToInitializePhysicalDevice;
         };
 
-        heap.surface = Surface.init(window, &heap.instance, &heap.physical_device) catch |err| {
+        self.surface.init(window, &self.instance, &self.physical_device) catch |err| {
             log.err("Failed to initialize surface: {}", .{err});
             return error.FailedToInitializeSurface;
         };
 
-        heap.device = Device.init(&heap.physical_device, &heap.surface) catch |err| {
+        self.device.init(&self.physical_device, &self.surface) catch |err| {
             log.err("Failed to initialize device: {}", .{err});
             return error.FailedToInitializeDevice;
         };
 
-        heap.vma = VmaAllocator.init(&heap.instance, &heap.physical_device, &heap.device) catch |err| {
+        self.vma.init(&self.instance, &self.physical_device, &self.device) catch |err| {
             log.err("Failed to initialize allocator: {}", .{err});
             return error.FailedToInitializeAllocator;
         };
 
-        heap.swapchain = Swapchain.init(window, &heap.surface, &heap.device, &heap.vma) catch |err| {
+        self.swapchain.init(window, &self.surface, &self.device, &self.vma) catch |err| {
             log.err("Failed to initialize swapchain: {}", .{err});
             return error.FailedToInitializeSwapchain;
         };
 
-        heap.bindless = Bindless.init(&heap.device) catch |err| {
+        self.bindless.init(&self.device) catch |err| {
             log.err("Failed to initialize bindless: {}", .{err});
             return error.FailedToInitializeBindless;
         };
 
-        heap.transfer = Transfer.init(&heap.device, &heap.vma, &heap.bindless) catch |err| {
+        self.transfer.init(&self.device, &self.vma, &self.bindless) catch |err| {
             log.err("Failed to initialize transfer: {}", .{err});
             return error.FailedToInitializeTransfer;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *Vulkan) void {
         log.info("Deinitializing...", .{});
+        self.device.waitIdle();
 
-        if (self.heap) |heap| {
-            heap.device.waitIdle();
-
-            heap.transfer.deinit();
-            heap.bindless.deinit();
-            heap.swapchain.deinit();
-            heap.vma.deinit();
-            heap.device.deinit();
-            heap.surface.deinit();
-            heap.physical_device.deinit();
-            heap.instance.deinit();
-
-            memory.default_allocator.destroy(heap);
-        }
-        self.* = undefined;
-    }
-
-    pub fn get(self: *Vulkan, comptime T: type) *T {
-        std.debug.assert(self.heap != null);
-
-        inline for (@typeInfo(Heap).Struct.fields) |field| {
-            if (field.type == T) {
-                return &@field(self.heap.?, field.name);
-            }
-        } else {
-            @compileError("Vulkan object does not contain field of type '" ++ @typeName(@TypeOf(T)) ++ "'");
-        }
+        self.transfer.deinit();
+        self.bindless.deinit();
+        self.swapchain.deinit();
+        self.vma.deinit();
+        self.device.deinit();
+        self.surface.deinit();
+        self.physical_device.deinit();
+        self.instance.deinit();
+        self.* = .{};
     }
 
     pub fn recreateSwapchain(self: *Vulkan) !void {
-        self.heap.?.device.waitIdle();
-        try self.heap.?.swapchain.recreate();
-    }
-
-    pub fn waitIdle(self: *Vulkan) void {
-        if (self.heap) |heap| {
-            heap.device.waitIdle();
-        }
+        self.device.waitIdle();
+        try self.swapchain.recreate();
     }
 };

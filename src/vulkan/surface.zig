@@ -16,8 +16,7 @@ pub const Surface = struct {
     capabilities: c.VkSurfaceCapabilitiesKHR = undefined,
     present_modes: []c.VkPresentModeKHR = &.{},
 
-    pub fn init(window: *Window, instance: *Instance, physical_device: *const PhysicalDevice) !Surface {
-        var self = Surface{};
+    pub fn init(self: *Surface, window: *Window, instance: *Instance, physical_device: *const PhysicalDevice) !void {
         errdefer self.deinit();
 
         self.instance = instance;
@@ -27,13 +26,11 @@ pub const Surface = struct {
             log.err("Failed to create window surface: {}", .{err});
             return error.FailedToCreatenWindowSurface;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *Surface) void {
         self.destroyWindowSurface();
-        self.* = undefined;
+        self.* = .{};
     }
 
     fn createWindowSurface(self: *Surface, window: *Window, instance: *Instance) !void {

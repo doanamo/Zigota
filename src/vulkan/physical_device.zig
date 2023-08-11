@@ -12,21 +12,18 @@ pub const PhysicalDevice = struct {
     properties: c.VkPhysicalDeviceProperties = undefined,
     features: c.VkPhysicalDeviceFeatures = undefined,
 
-    pub fn init(instance: *Instance) !PhysicalDevice {
-        var self = PhysicalDevice{};
+    pub fn init(self: *PhysicalDevice, instance: *Instance) !void {
         errdefer self.deinit();
 
         self.selectPhysicalDevice(instance) catch |err| {
             log.err("Failed to select physical device: {}", .{err});
             return error.FailedToSelectPhysicalDevice;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *PhysicalDevice) void {
         // Physial device is owned by instance
-        self.* = undefined;
+        self.* = .{};
     }
 
     fn selectPhysicalDevice(self: *PhysicalDevice, instance: *const Instance) !void {

@@ -13,8 +13,7 @@ pub const Instance = struct {
     handle: c.VkInstance = null,
     debug_callback: c.VkDebugReportCallbackEXT = null,
 
-    pub fn init() !Instance {
-        var self = Instance{};
+    pub fn init(self: *Instance) !void {
         errdefer self.deinit();
 
         self.createInstance() catch |err| {
@@ -26,14 +25,12 @@ pub const Instance = struct {
             log.err("Failed to create debug callback: {}", .{err});
             return error.FailedToCreateDebugCallback;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *Instance) void {
         self.destroyDebugCallback();
         self.destroyInstance();
-        self.* = undefined;
+        self.* = .{};
     }
 
     fn createInstance(self: *Instance) !void {

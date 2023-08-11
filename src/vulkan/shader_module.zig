@@ -21,7 +21,7 @@ pub const ShaderModule = struct {
     byte_code: ByteCode = &.{},
     device: *Device = undefined,
 
-    pub fn loadFromFile(device: *Device, path: []const u8) !ShaderModule {
+    pub fn loadFromFile(self: *ShaderModule, device: *Device, path: []const u8) !void {
         const byte_code = std.fs.cwd().readFileAllocOptions(
             memory.frame_allocator,
             path,
@@ -35,17 +35,15 @@ pub const ShaderModule = struct {
         };
         defer memory.frame_allocator.free(byte_code);
 
-        var shader_module = ShaderModule.init(device, byte_code) catch |err| {
+        self.init(device, byte_code) catch |err| {
             log.err("Failed to create shader module from \"{s}\" file: {}", .{ path, err });
             return error.FailedToCreateShaderModuleFromFile;
         };
 
         log.info("Loaded shader module from \"{s}\" file", .{path});
-        return shader_module;
     }
 
-    pub fn init(device: *Device, byte_code: ByteCode) !ShaderModule {
-        var self = ShaderModule{};
+    pub fn init(self: *ShaderModule, device: *Device, byte_code: ByteCode) !void {
         errdefer self.deinit();
 
         self.device = device;
@@ -59,14 +57,12 @@ pub const ShaderModule = struct {
             log.err("Failed to create shader module reflection: {}", .{err});
             return error.FailedToCreateShaderModuleReflection;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *ShaderModule) void {
         self.destroyReflection();
         self.destroyShaderModule();
-        self.* = undefined;
+        self.* = .{};
     }
 
     fn createShaderModule(self: *ShaderModule, byte_code: ByteCode) !void {

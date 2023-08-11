@@ -29,10 +29,8 @@ pub const Bindless = struct {
     uniform_buffer_infos: std.ArrayListUnmanaged(c.VkDescriptorBufferInfo) = .{},
     descriptor_set_writes: std.ArrayListUnmanaged(c.VkWriteDescriptorSet) = .{},
 
-    pub fn init(device: *Device) !Bindless {
+    pub fn init(self: *Bindless, device: *Device) !void {
         log.info("Initializing bindless...", .{});
-
-        var self = Bindless{};
         errdefer self.deinit();
 
         self.device = device;
@@ -57,35 +55,28 @@ pub const Bindless = struct {
             log.err("Failed to create pipeline layout: {}", .{err});
             return error.FailedToCreatePipelineLayout;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *Bindless) void {
+        // Allocated descriptor set is freed when the descriptor pool is destroyed.
         self.uniform_buffer_infos.deinit(memory.default_allocator);
         self.descriptor_set_writes.deinit(memory.default_allocator);
-
-        // Allocated descriptor set is freed when the descriptor pool is destroyed.
+        self.uniform_buffers_free_ids.deinit();
         self.destroyPipelineLayout();
         self.destroyDescriptorSetLayout();
         self.destroyDescriptorPool();
-
-        self.uniform_buffers_free_ids.deinit();
-
-        self.* = undefined;
+        self.* = .{};
     }
 
     fn createDescriptorPool(self: *Bindless) !void {
-        const pool_sizes = [_]c.VkDescriptorPoolSize{
-            .{
-                .type = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .descriptorCount = descriptor_count,
-            },
-        };
-
-        self.descriptor_pool = try DescriptorPool.init(self.device, .{
+        try self.descriptor_pool.init(self.device, .{
             .max_set_count = 1,
-            .pool_sizes = &pool_sizes,
+            .pool_sizes = &[_]c.VkDescriptorPoolSize{
+                .{
+                    .type = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                    .descriptorCount = descriptor_count,
+                },
+            },
             .flags = c.VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
         });
     }

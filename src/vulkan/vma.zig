@@ -12,10 +12,8 @@ const Device = @import("device.zig").Device;
 pub const VmaAllocator = struct {
     handle: c.VmaAllocator = null,
 
-    pub fn init(instance: *Instance, physical_device: *PhysicalDevice, device: *Device) !VmaAllocator {
+    pub fn init(self: *VmaAllocator, instance: *Instance, physical_device: *PhysicalDevice, device: *Device) !void {
         log.info("Creating memory allocator...", .{});
-
-        var self = VmaAllocator{};
         errdefer self.deinit();
 
         const vulkan_functions = c.VmaVulkanFunctions{
@@ -65,13 +63,12 @@ pub const VmaAllocator = struct {
             log.err("Failed to create memory allocator: {}", .{err});
             return error.FailedToCreateMemoryAllocator;
         };
-
-        return self;
     }
 
     pub fn deinit(self: *VmaAllocator) void {
         if (self.handle != null) {
             c.vmaDestroyAllocator(self.handle);
         }
+        self.* = .{};
     }
 };

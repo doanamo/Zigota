@@ -18,7 +18,7 @@ pub const Buffer = struct {
     bindless_id: Bindless.IdentifierType = Bindless.invalid_id,
     size: usize = undefined,
 
-    pub fn init(vma: *VmaAllocator, params: struct {
+    pub fn init(self: *Buffer, vma: *VmaAllocator, params: struct {
         size: usize,
         usage_flags: c.VkBufferUsageFlags,
         sharing_mode: c.VkSharingMode = c.VK_SHARING_MODE_EXCLUSIVE,
@@ -26,8 +26,7 @@ pub const Buffer = struct {
         memory_flags: c.VmaPoolCreateFlags = 0,
         memory_priority: f32 = 0.0,
         bindless: ?*Bindless = null,
-    }) !Buffer {
-        var self = Buffer{};
+    }) !void {
         errdefer self.deinit();
 
         self.vma = vma;
@@ -64,12 +63,11 @@ pub const Buffer = struct {
         };
 
         if (params.bindless != null) {
-            self.bindless_id = try params.bindless.?.registerResource(&self);
+            self.bindless_id = try params.bindless.?.registerResource(self);
             std.debug.assert(self.bindless_id != Bindless.invalid_id);
         }
 
         log.info("Created {s} ({} bytes)", .{ self.getName(), params.size });
-        return self;
     }
 
     pub fn deinit(self: *Buffer) void {
@@ -81,7 +79,7 @@ pub const Buffer = struct {
             c.vmaDestroyBuffer(self.vma.handle, self.handle, self.allocation);
         }
 
-        self.* = undefined;
+        self.* = .{};
     }
 
     pub fn map(self: *Buffer) ![]u8 {
