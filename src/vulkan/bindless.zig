@@ -169,7 +169,39 @@ pub const Bindless = struct {
         }
     }
 
-    pub fn registerUniformBuffer(self: *Bindless, uniform_buffer: *Buffer) u32 {
+    pub fn registerResource(self: *Bindless, resource: anytype) !IdentifierType {
+        const bindless_id = switch (@TypeOf(resource)) {
+            *Buffer => blk: {
+                if (resource.usage_flags & c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT != 0) {
+                    break :blk self.registerUniformBuffer(resource);
+                } else {
+                    log.err("Bindless resource not supported for this buffer usage", .{});
+                    return error.UnsupportedBindlessBufferUsage;
+                }
+            },
+            else => @compileError("Unsupported resource typer, found '" ++ @typeName(@TypeOf(resource)) ++ "'"),
+        };
+
+        std.debug.assert(bindless_id != Bindless.invalid_id);
+        return bindless_id;
+    }
+
+    pub fn unregisterResource(self: *Bindless, resource: anytype, bindless_id: IdentifierType) void {
+        std.debug.assert(bindless_id < invalid_id);
+
+        switch (@TypeOf(resource)) {
+            *Buffer => {
+                if (resource.usage_flags & c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT != 0) {
+                    self.unregisterUniformBuffer(bindless_id);
+                } else {
+                    unreachable;
+                }
+            },
+            else => @compileError("Unsupported resource typer, found '" ++ @typeName(@TypeOf(resource)) ++ "'"),
+        }
+    }
+
+    fn registerUniformBuffer(self: *Bindless, uniform_buffer: *Buffer) IdentifierType {
         std.debug.assert(uniform_buffer.handle != null);
         std.debug.assert(uniform_buffer.usage_flags & c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT != 0);
 
@@ -208,9 +240,8 @@ pub const Bindless = struct {
         return bindless_id;
     }
 
-    pub fn unregisterUniformBuffer(self: *Bindless, bindless_id: u32) void {
+    fn unregisterUniformBuffer(self: *Bindless, bindless_id: IdentifierType) void {
         std.debug.assert(bindless_id < self.uniform_buffers_next_id);
-        std.debug.assert(bindless_id < invalid_id);
         self.uniform_buffers_free_ids.writeItem(bindless_id) catch unreachable;
     }
 

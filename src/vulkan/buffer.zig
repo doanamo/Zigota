@@ -64,13 +64,7 @@ pub const Buffer = struct {
         };
 
         if (params.bindless != null) {
-            if (params.usage_flags & c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT != 0) {
-                self.bindless_id = params.bindless.?.registerUniformBuffer(&self);
-            } else {
-                log.err("Bindless resource not supported for this buffer usage", .{});
-                return error.UnsupportedBindlessBufferUsage;
-            }
-
+            self.bindless_id = try params.bindless.?.registerResource(&self);
             std.debug.assert(self.bindless_id != Bindless.invalid_id);
         }
 
@@ -80,9 +74,7 @@ pub const Buffer = struct {
 
     pub fn deinit(self: *Buffer) void {
         if (self.bindless_id != Bindless.invalid_id) {
-            if (self.usage_flags & c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT != 0) {
-                self.bindless.?.unregisterUniformBuffer(self.bindless_id);
-            }
+            self.bindless.?.unregisterResource(self, self.bindless_id);
         }
 
         if (self.handle != null) {
