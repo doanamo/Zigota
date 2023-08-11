@@ -18,7 +18,10 @@ pub inline fn degrees(rad: f32) f32 {
 }
 
 pub inline fn splat(comptime T: type, value: f32) T {
-    return @as(T, @splat(value));
+    switch (T) {
+        Vec2, Vec3, Vec4 => return @as(T, @splat(value)),
+        else => @compileError("Expected vector, found '" ++ @typeName(T) ++ "'"),
+    }
 }
 
 pub inline fn dot(a: anytype, b: @TypeOf(a)) f32 {
