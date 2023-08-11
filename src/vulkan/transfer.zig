@@ -157,7 +157,7 @@ pub const Transfer = struct {
                 break;
 
             const data_upload_size = @min(data_remaining_size, staging_remaining_size);
-            try self.staging_buffer.upload(data[data_offset .. data_offset + data_upload_size], self.staging_offset);
+            try self.staging_buffer.upload(data[data_offset..][0..data_upload_size], self.staging_offset);
 
             try self.buffer_copy_commands.append(memory.default_allocator, BufferCopyCommand{
                 .buffer = buffer.handle,

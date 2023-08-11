@@ -98,7 +98,7 @@ pub const Buffer = struct {
         defer self.unmap();
 
         std.debug.assert(offset + data.len <= self.size);
-        @memcpy(mapped_data[offset .. offset + data.len], data);
+        @memcpy(mapped_data[offset..][0..data.len], data);
     }
 
     pub fn flush(self: *Buffer, offset: usize, size: usize) !void {
