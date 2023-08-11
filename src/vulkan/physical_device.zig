@@ -5,6 +5,7 @@ const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
 const check = utility.vulkanCheckResult;
 
+const Vulkan = @import("../vulkan.zig").Vulkan;
 const Instance = @import("instance.zig").Instance;
 
 pub const PhysicalDevice = struct {
@@ -12,10 +13,10 @@ pub const PhysicalDevice = struct {
     properties: c.VkPhysicalDeviceProperties = undefined,
     features: c.VkPhysicalDeviceFeatures = undefined,
 
-    pub fn init(self: *PhysicalDevice, instance: *Instance) !void {
+    pub fn init(self: *PhysicalDevice, vulkan: *Vulkan) !void {
         errdefer self.deinit();
 
-        self.selectPhysicalDevice(instance) catch |err| {
+        self.selectPhysicalDevice(vulkan) catch |err| {
             log.err("Failed to select physical device: {}", .{err});
             return error.FailedToSelectPhysicalDevice;
         };
@@ -26,12 +27,12 @@ pub const PhysicalDevice = struct {
         self.* = .{};
     }
 
-    fn selectPhysicalDevice(self: *PhysicalDevice, instance: *const Instance) !void {
+    fn selectPhysicalDevice(self: *PhysicalDevice, vulkan: *Vulkan) !void {
         // Simplified physical device selection - select first that is dedictated GPU
         log.info("Selecting physical device...", .{});
 
         var physical_device_count: u32 = 0;
-        try check(c.vkEnumeratePhysicalDevices.?(instance.handle, &physical_device_count, null));
+        try check(c.vkEnumeratePhysicalDevices.?(vulkan.instance.handle, &physical_device_count, null));
         if (physical_device_count == 0) {
             log.err("Failed to find any physical devices", .{});
             return error.NoAvailableDevices;
@@ -39,7 +40,7 @@ pub const PhysicalDevice = struct {
 
         const physical_devices = try memory.default_allocator.alloc(c.VkPhysicalDevice, physical_device_count);
         defer memory.default_allocator.free(physical_devices);
-        try check(c.vkEnumeratePhysicalDevices.?(instance.handle, &physical_device_count, physical_devices.ptr));
+        try check(c.vkEnumeratePhysicalDevices.?(vulkan.instance.handle, &physical_device_count, physical_devices.ptr));
 
         const PhysicalDeviceCandidate = struct {
             device: c.VkPhysicalDevice,

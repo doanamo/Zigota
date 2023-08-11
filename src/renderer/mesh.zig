@@ -5,6 +5,7 @@ const utility = @import("../utility.zig");
 const vertex_attributes = @import("../vulkan/vertex_attributes.zig");
 const log = std.log.scoped(.Renderer);
 
+const Vulkan = @import("../vulkan.zig").Vulkan;
 const Transfer = @import("../vulkan/transfer.zig").Transfer;
 const Buffer = @import("../vulkan/buffer.zig").Buffer;
 const VertexAttributeType = vertex_attributes.VertexAttributeType;
@@ -49,10 +50,10 @@ pub const Mesh = struct {
     index_buffer: Buffer = .{},
     index_type_bytes: u8 = undefined,
 
-    pub fn init(self: *Mesh, transfer: *Transfer, path: []const u8) !void {
+    pub fn init(self: *Mesh, vulkan: *Vulkan, path: []const u8) !void {
         errdefer self.deinit();
 
-        self.loadFromFile(transfer, path) catch |err| {
+        self.loadFromFile(vulkan, path) catch |err| {
             log.err("Failed to load mesh from \"{s}\" file: {}", .{ path, err });
             return error.FailedToLoadFromFile;
         };
@@ -65,7 +66,7 @@ pub const Mesh = struct {
         self.* = .{};
     }
 
-    fn loadFromFile(self: *Mesh, transfer: *Transfer, path: []const u8) !void {
+    fn loadFromFile(self: *Mesh, vulkan: *Vulkan, path: []const u8) !void {
         var file = try std.fs.cwd().openFile(path, .{ .mode = .read_only });
         defer file.close();
 
@@ -84,7 +85,7 @@ pub const Mesh = struct {
             return error.InvalidVerticesHeader;
         } else {
             var current_attribute_offset: usize = 0;
-            try self.vertex_buffer.init(transfer.vma, .{
+            try self.vertex_buffer.init(vulkan, .{
                 .size = vertices_header.vertex_count * vertices_header.attribute_types.getTotalSize(),
                 .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT | c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
             });
@@ -95,7 +96,7 @@ pub const Mesh = struct {
                 }
 
                 const attribute_data_size = vertices_header.vertex_count * vertex_attributes.getVertexAttributeSize(attribute);
-                try transfer.uploadFromReader(&self.vertex_buffer, current_attribute_offset, attribute_data_size, reader);
+                try vulkan.transfer.uploadFromReader(&self.vertex_buffer, current_attribute_offset, attribute_data_size, reader);
 
                 try self.attribute_offsets.append(memory.default_allocator, current_attribute_offset);
                 current_attribute_offset += attribute_data_size;
@@ -108,12 +109,12 @@ pub const Mesh = struct {
             return error.InvalidIndicesHeader;
         } else {
             self.index_type_bytes = @intCast(indices_header.index_type_bytes);
-            try self.index_buffer.init(transfer.vma, .{
+            try self.index_buffer.init(vulkan, .{
                 .size = indices_header.index_count * indices_header.index_type_bytes,
                 .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT | c.VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
             });
 
-            try transfer.uploadFromReader(&self.index_buffer, 0, self.index_buffer.size, reader);
+            try vulkan.transfer.uploadFromReader(&self.index_buffer, 0, self.index_buffer.size, reader);
         }
 
         if (reader.readBytesNoEof(4) != error.EndOfStream) {

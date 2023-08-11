@@ -6,6 +6,7 @@ const vertex_attributes = @import("vertex_attributes.zig");
 const log = std.log.scoped(.Vulkan);
 const check = utility.vulkanCheckResult;
 
+const Vulkan = @import("../vulkan.zig").Vulkan;
 const Device = @import("device.zig").Device;
 const Swapchain = @import("swapchain.zig").Swapchain;
 const Bindless = @import("bindless.zig").Bindless;
@@ -20,8 +21,7 @@ pub const PipelineBuilder = struct {
         module: ShaderModule,
     };
 
-    device: *Device = undefined,
-    bindless: *Bindless = undefined,
+    vulkan: *Vulkan = undefined,
     shader_stages: std.ArrayListUnmanaged(ShaderStageEntry) = .{},
     shader_stages_mask: c.VkShaderStageFlagBits = 0,
     shader_stage_create_infos: std.ArrayListUnmanaged(c.VkPipelineShaderStageCreateInfo) = .{},
@@ -34,11 +34,10 @@ pub const PipelineBuilder = struct {
     depth_write_enable: bool = true,
     stencil_test_enable: bool = false,
 
-    pub fn init(self: *PipelineBuilder, device: *Device, bindless: *Bindless) !void {
+    pub fn init(self: *PipelineBuilder, vulkan: *Vulkan) !void {
         errdefer self.deinit();
 
-        self.device = device;
-        self.bindless = bindless;
+        self.vulkan = vulkan;
 
         try self.shader_stages.ensureTotalCapacityPrecise(memory.frame_allocator, shader_stage_count);
         try self.shader_stage_create_infos.ensureTotalCapacityPrecise(memory.frame_allocator, shader_stage_count);
@@ -57,7 +56,7 @@ pub const PipelineBuilder = struct {
 
     pub fn loadShaderModule(self: *PipelineBuilder, shader_stage: ShaderStage, path: []const u8) !void {
         var shader_module = ShaderModule{};
-        try shader_module.loadFromFile(self.device, path);
+        try shader_module.loadFromFile(self.vulkan, path);
         errdefer shader_module.deinit();
 
         const shader_stage_flag = @intFromEnum(shader_stage);
@@ -280,7 +279,7 @@ pub const PipelineBuilder = struct {
             .pDepthStencilState = &depth_stencil_state_create_info,
             .pColorBlendState = &color_blend_state_create_info,
             .pDynamicState = &dynamic_state_create_info,
-            .layout = self.bindless.pipeline_layout,
+            .layout = self.vulkan.bindless.pipeline_layout,
             .renderPass = null,
             .subpass = 0,
             .basePipelineHandle = null,
@@ -288,7 +287,7 @@ pub const PipelineBuilder = struct {
         };
 
         var pipeline: c.VkPipeline = undefined;
-        check(c.vkCreateGraphicsPipelines.?(self.device.handle, null, 1, &pipeline_create_info, memory.vulkan_allocator, &pipeline)) catch |err| {
+        check(c.vkCreateGraphicsPipelines.?(self.vulkan.device.handle, null, 1, &pipeline_create_info, memory.vulkan_allocator, &pipeline)) catch |err| {
             log.err("Failed to create graphics pipeline: {}", .{err});
             return error.FailedToCreateGraphicsPipeline;
         };
@@ -297,7 +296,7 @@ pub const PipelineBuilder = struct {
 
         return .{
             .handle = pipeline,
-            .device = self.device.handle,
+            .device = self.vulkan.device.handle,
         };
     }
 };
@@ -310,5 +309,7 @@ pub const Pipeline = struct {
         if (self.handle != null) {
             c.vkDestroyPipeline.?(self.device, self.handle, memory.vulkan_allocator);
         }
+
+        self.* = .{};
     }
 };

@@ -5,15 +5,16 @@ const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
 const check = utility.vulkanCheckResult;
 
+const Vulkan = @import("../vulkan.zig").Vulkan;
 const VmaAllocator = @import("vma.zig").VmaAllocator;
 
 pub const Image = struct {
+    vulkan: *Vulkan = undefined,
     handle: c.VkImage = null,
-    vma: *VmaAllocator = undefined,
     allocation: c.VmaAllocation = undefined,
     usage_flags: c.VkImageUsageFlags = 0,
 
-    pub fn init(self: *Image, vma: *VmaAllocator, params: struct {
+    pub fn init(self: *Image, vulkan: *Vulkan, params: struct {
         format: c.VkFormat,
         extent: c.VkExtent3D,
         usage_flags: c.VkImageUsageFlags,
@@ -27,7 +28,7 @@ pub const Image = struct {
     }) !void {
         errdefer self.deinit();
 
-        self.vma = vma;
+        self.vulkan = vulkan;
         self.usage_flags = params.usage_flags;
 
         const image_create_info = c.VkImageCreateInfo{
@@ -60,7 +61,7 @@ pub const Image = struct {
         };
 
         var allocation_info: c.VmaAllocationInfo = undefined;
-        check(c.vmaCreateImage(vma.handle, &image_create_info, &allocation_create_info, &self.handle, &self.allocation, &allocation_info)) catch |err| {
+        check(c.vmaCreateImage(vulkan.vma.handle, &image_create_info, &allocation_create_info, &self.handle, &self.allocation, &allocation_info)) catch |err| {
             log.err("Failed to create image: {}", .{err});
             return error.FailedToCreateImage;
         };
@@ -70,8 +71,9 @@ pub const Image = struct {
 
     pub fn deinit(self: *Image) void {
         if (self.handle != null) {
-            c.vmaDestroyImage(self.vma.handle, self.handle, self.allocation);
+            c.vmaDestroyImage(self.vulkan.vma.handle, self.handle, self.allocation);
         }
+
         self.* = .{};
     }
 

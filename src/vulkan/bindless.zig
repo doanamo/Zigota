@@ -5,6 +5,7 @@ const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
 const check = utility.vulkanCheckResult;
 
+const Vulkan = @import("../vulkan.zig").Vulkan;
 const Device = @import("device.zig").Device;
 const Buffer = @import("buffer.zig").Buffer;
 const DescriptorPool = @import("descriptor_pool.zig").DescriptorPool;
@@ -17,11 +18,11 @@ pub const Bindless = struct {
 
     const uniform_buffer_binding = 0;
 
+    vulkan: *Vulkan = undefined,
     descriptor_pool: DescriptorPool = .{},
     descriptor_set_layout: c.VkDescriptorSetLayout = null,
     descriptor_set: c.VkDescriptorSet = null,
     pipeline_layout: c.VkPipelineLayout = null,
-    device: *Device = undefined,
 
     uniform_buffers_next_id: u32 = 0,
     uniform_buffers_free_ids: std.fifo.LinearFifo(u32, .Dynamic) = undefined,
@@ -29,11 +30,11 @@ pub const Bindless = struct {
     uniform_buffer_infos: std.ArrayListUnmanaged(c.VkDescriptorBufferInfo) = .{},
     descriptor_set_writes: std.ArrayListUnmanaged(c.VkWriteDescriptorSet) = .{},
 
-    pub fn init(self: *Bindless, device: *Device) !void {
+    pub fn init(self: *Bindless, vulkan: *Vulkan) !void {
         log.info("Initializing bindless...", .{});
         errdefer self.deinit();
 
-        self.device = device;
+        self.vulkan = vulkan;
         self.uniform_buffers_free_ids = @TypeOf(self.uniform_buffers_free_ids).init(memory.default_allocator);
 
         self.createDescriptorPool() catch |err| {
@@ -69,7 +70,7 @@ pub const Bindless = struct {
     }
 
     fn createDescriptorPool(self: *Bindless) !void {
-        try self.descriptor_pool.init(self.device, .{
+        try self.descriptor_pool.init(self.vulkan, .{
             .max_set_count = 1,
             .pool_sizes = &[_]c.VkDescriptorPoolSize{
                 .{
@@ -115,12 +116,12 @@ pub const Bindless = struct {
             .pBindings = &layout_bindings,
         };
 
-        try check(c.vkCreateDescriptorSetLayout.?(self.device.handle, &layout_create_info, memory.vulkan_allocator, &self.descriptor_set_layout));
+        try check(c.vkCreateDescriptorSetLayout.?(self.vulkan.device.handle, &layout_create_info, memory.vulkan_allocator, &self.descriptor_set_layout));
     }
 
     fn destroyDescriptorSetLayout(self: *Bindless) void {
         if (self.descriptor_set_layout != null) {
-            c.vkDestroyDescriptorSetLayout.?(self.device.handle, self.descriptor_set_layout, memory.vulkan_allocator);
+            c.vkDestroyDescriptorSetLayout.?(self.vulkan.device.handle, self.descriptor_set_layout, memory.vulkan_allocator);
         }
     }
 
@@ -133,7 +134,7 @@ pub const Bindless = struct {
             .pSetLayouts = &self.descriptor_set_layout,
         };
 
-        try check(c.vkAllocateDescriptorSets.?(self.device.handle, &allocate_info, &self.descriptor_set));
+        try check(c.vkAllocateDescriptorSets.?(self.vulkan.device.handle, &allocate_info, &self.descriptor_set));
     }
 
     fn createPipelineLayout(self: *Bindless) !void {
@@ -151,12 +152,12 @@ pub const Bindless = struct {
             },
         };
 
-        try check(c.vkCreatePipelineLayout.?(self.device.handle, &pipeline_layout_create_info, memory.vulkan_allocator, &self.pipeline_layout));
+        try check(c.vkCreatePipelineLayout.?(self.vulkan.device.handle, &pipeline_layout_create_info, memory.vulkan_allocator, &self.pipeline_layout));
     }
 
     fn destroyPipelineLayout(self: *Bindless) void {
         if (self.pipeline_layout != null) {
-            c.vkDestroyPipelineLayout.?(self.device.handle, self.pipeline_layout, memory.vulkan_allocator);
+            c.vkDestroyPipelineLayout.?(self.vulkan.device.handle, self.pipeline_layout, memory.vulkan_allocator);
         }
     }
 
@@ -238,7 +239,7 @@ pub const Bindless = struct {
 
     pub fn updateDescriptorSet(self: *Bindless) void {
         if (self.descriptor_set_writes.items.len > 0) {
-            c.vkUpdateDescriptorSets.?(self.device.handle, @intCast(self.descriptor_set_writes.items.len), self.descriptor_set_writes.items.ptr, 0, null);
+            c.vkUpdateDescriptorSets.?(self.vulkan.device.handle, @intCast(self.descriptor_set_writes.items.len), self.descriptor_set_writes.items.ptr, 0, null);
         }
 
         self.uniform_buffer_infos.clearRetainingCapacity();

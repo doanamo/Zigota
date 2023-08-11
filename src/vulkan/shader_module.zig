@@ -6,6 +6,7 @@ const log = std.log.scoped(.Vulkan);
 const check = utility.vulkanCheckResult;
 const checkSpv = utility.spvReflectCheckResult;
 
+const Vulkan = @import("../vulkan.zig").Vulkan;
 const Device = @import("device.zig").Device;
 
 pub const ShaderStage = enum(c.VkShaderStageFlagBits) {
@@ -16,12 +17,12 @@ pub const ShaderStage = enum(c.VkShaderStageFlagBits) {
 pub const ShaderModule = struct {
     const ByteCode = []align(@alignOf(u32)) u8;
 
+    vulkan: *Vulkan = undefined,
     handle: c.VkShaderModule = null,
     reflect: c.SpvReflectShaderModule = std.mem.zeroes(c.SpvReflectShaderModule),
     byte_code: ByteCode = &.{},
-    device: *Device = undefined,
 
-    pub fn loadFromFile(self: *ShaderModule, device: *Device, path: []const u8) !void {
+    pub fn loadFromFile(self: *ShaderModule, vulkan: *Vulkan, path: []const u8) !void {
         const byte_code = std.fs.cwd().readFileAllocOptions(
             memory.frame_allocator,
             path,
@@ -35,7 +36,7 @@ pub const ShaderModule = struct {
         };
         defer memory.frame_allocator.free(byte_code);
 
-        self.init(device, byte_code) catch |err| {
+        self.init(vulkan, byte_code) catch |err| {
             log.err("Failed to create shader module from \"{s}\" file: {}", .{ path, err });
             return error.FailedToCreateShaderModuleFromFile;
         };
@@ -43,10 +44,10 @@ pub const ShaderModule = struct {
         log.info("Loaded shader module from \"{s}\" file", .{path});
     }
 
-    pub fn init(self: *ShaderModule, device: *Device, byte_code: ByteCode) !void {
+    pub fn init(self: *ShaderModule, vulkan: *Vulkan, byte_code: ByteCode) !void {
         errdefer self.deinit();
 
-        self.device = device;
+        self.vulkan = vulkan;
 
         self.createShaderModule(byte_code) catch |err| {
             log.err("Failed to create shader module: {}", .{err});
@@ -74,12 +75,12 @@ pub const ShaderModule = struct {
             .pCode = std.mem.bytesAsSlice(u32, byte_code).ptr,
         };
 
-        try check(c.vkCreateShaderModule.?(self.device.handle, create_info, memory.vulkan_allocator, &self.handle));
+        try check(c.vkCreateShaderModule.?(self.vulkan.device.handle, create_info, memory.vulkan_allocator, &self.handle));
     }
 
     fn destroyShaderModule(self: *ShaderModule) void {
         if (self.handle != null) {
-            c.vkDestroyShaderModule.?(self.device.handle, self.handle, memory.vulkan_allocator);
+            c.vkDestroyShaderModule.?(self.vulkan.device.handle, self.handle, memory.vulkan_allocator);
         }
     }
 

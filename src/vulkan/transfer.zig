@@ -6,6 +6,7 @@ const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
 const check = utility.vulkanCheckResult;
 
+const Vulkan = @import("../vulkan.zig").Vulkan;
 const Device = @import("device.zig").Device;
 const VmaAllocator = @import("vma.zig").VmaAllocator;
 const Bindless = @import("bindless.zig").Bindless;
@@ -25,10 +26,7 @@ pub const Transfer = struct {
         size: c.VkDeviceSize = 0,
     };
 
-    device: *Device = undefined,
-    vma: *VmaAllocator = undefined,
-    bindless: *Bindless = undefined,
-
+    vulkan: *Vulkan = undefined,
     command_pool: CommandPool = .{},
     command_buffer: CommandBuffer = .{},
     staging_buffer: Buffer = .{},
@@ -40,13 +38,11 @@ pub const Transfer = struct {
     finished_semaphore: c.VkSemaphore = null,
     finished_semaphore_index: u64 = 0,
 
-    pub fn init(self: *Transfer, device: *Device, vma: *VmaAllocator, bindless: *Bindless) !void {
+    pub fn init(self: *Transfer, vulkan: *Vulkan) !void {
         log.info("Initializing transfer queue...", .{});
         errdefer self.deinit();
 
-        self.device = device;
-        self.vma = vma;
-        self.bindless = bindless;
+        self.vulkan = vulkan;
 
         self.createCommandPool() catch |err| {
             log.err("Failed to create transfer command pool: {}", .{err});
@@ -74,19 +70,19 @@ pub const Transfer = struct {
     fn createCommandPool(self: *Transfer) !void {
         log.info("Creating transfer command pool", .{});
 
-        try self.command_pool.init(self.device, .{
+        try self.command_pool.init(self.vulkan, .{
             .queue = .Transfer,
             .flags = c.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
         });
 
-        try self.command_buffer.init(self.device, .{
+        try self.command_buffer.init(self.vulkan, .{
             .command_pool = &self.command_pool,
             .level = c.VK_COMMAND_BUFFER_LEVEL_PRIMARY,
         });
     }
 
     fn destroyCommandPool(self: *Transfer) void {
-        self.command_buffer.deinit(self.device, &self.command_pool);
+        self.command_buffer.deinit();
         self.command_pool.deinit();
     }
 
@@ -96,7 +92,7 @@ pub const Transfer = struct {
         const config = root.config.vulkan.transfer;
         self.staging_size = utility.fromKilobytes(config.staging_size_kb);
 
-        try self.staging_buffer.init(self.vma, .{
+        try self.staging_buffer.init(self.vulkan, .{
             .size = self.staging_size,
             .usage_flags = c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             .memory_flags = c.VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | c.VMA_ALLOCATION_CREATE_MAPPED_BIT,
@@ -126,12 +122,12 @@ pub const Transfer = struct {
             .flags = 0,
         };
 
-        try check(c.vkCreateSemaphore.?(self.device.handle, &semaphore_create_info, memory.vulkan_allocator, &self.finished_semaphore));
+        try check(c.vkCreateSemaphore.?(self.vulkan.device.handle, &semaphore_create_info, memory.vulkan_allocator, &self.finished_semaphore));
     }
 
     fn destroySynchronization(self: *Transfer) void {
         if (self.finished_semaphore != null) {
-            c.vkDestroySemaphore.?(self.device.handle, self.finished_semaphore, memory.vulkan_allocator);
+            c.vkDestroySemaphore.?(self.vulkan.device.handle, self.finished_semaphore, memory.vulkan_allocator);
         }
     }
 
@@ -181,8 +177,8 @@ pub const Transfer = struct {
             .srcAccessMask = c.VK_ACCESS_2_MEMORY_WRITE_BIT,
             .dstStageMask = 0,
             .dstAccessMask = 0,
-            .srcQueueFamilyIndex = self.device.getQueue(.Transfer).index,
-            .dstQueueFamilyIndex = self.device.getQueue(.Graphics).index,
+            .srcQueueFamilyIndex = self.vulkan.device.getQueue(.Transfer).index,
+            .dstQueueFamilyIndex = self.vulkan.device.getQueue(.Graphics).index,
             .buffer = buffer.handle,
             .offset = buffer_offset,
             .size = data.len,
@@ -204,8 +200,8 @@ pub const Transfer = struct {
             .srcAccessMask = 0,
             .dstStageMask = destination_stage_mask,
             .dstAccessMask = c.VK_ACCESS_2_MEMORY_READ_BIT,
-            .srcQueueFamilyIndex = self.device.getQueue(.Transfer).index,
-            .dstQueueFamilyIndex = self.device.getQueue(.Graphics).index,
+            .srcQueueFamilyIndex = self.vulkan.device.getQueue(.Transfer).index,
+            .dstQueueFamilyIndex = self.vulkan.device.getQueue(.Graphics).index,
             .buffer = buffer.handle,
             .offset = buffer_offset,
             .size = data.len,
@@ -297,7 +293,7 @@ pub const Transfer = struct {
         };
 
         self.finished_semaphore_index += 1;
-        try self.device.submit(.{
+        try self.vulkan.device.submit(.{
             .queue_type = .Transfer,
             .submit_count = 1,
             .submit_info = &submit_info,
@@ -315,7 +311,7 @@ pub const Transfer = struct {
             .pValues = &self.finished_semaphore_index,
         };
 
-        try check(c.vkWaitSemaphores.?(self.device.handle, &semaphore_wait_info, std.math.maxInt(u64)));
+        try check(c.vkWaitSemaphores.?(self.vulkan.device.handle, &semaphore_wait_info, std.math.maxInt(u64)));
     }
 
     pub fn recordOwnershipTransfers(self: *Transfer, command_buffer: *CommandBuffer) void {

@@ -6,6 +6,7 @@ const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
 const check = utility.vulkanCheckResult;
 
+const Vulkan = @import("../vulkan.zig").Vulkan;
 const Window = @import("../glfw/window.zig").Window;
 const Surface = @import("surface.zig").Surface;
 const Device = @import("device.zig").Device;
@@ -25,11 +26,8 @@ pub const Swapchain = struct {
         present_mode: PresentMode,
     };
 
+    vulkan: *Vulkan = undefined,
     handle: c.VkSwapchainKHR = null,
-    window: *Window = undefined,
-    surface: *Surface = undefined,
-    device: *Device = undefined,
-    vma: *VmaAllocator = undefined,
 
     images: std.ArrayListUnmanaged(c.VkImage) = .{},
     image_views: std.ArrayListUnmanaged(c.VkImageView) = .{},
@@ -47,13 +45,10 @@ pub const Swapchain = struct {
     frame_inflight_fences: std.ArrayListUnmanaged(c.VkFence) = .{},
     frame_index: u32 = 0,
 
-    pub fn init(self: *Swapchain, window: *Window, surface: *Surface, device: *Device, vma: *VmaAllocator) !void {
+    pub fn init(self: *Swapchain, vulkan: *Vulkan) !void {
         errdefer self.deinit();
 
-        self.window = window;
-        self.surface = surface;
-        self.device = device;
-        self.vma = vma;
+        self.vulkan = vulkan;
 
         self.createSwapchain() catch |err| {
             log.err("Failed to create swapchain: {}", .{err});
@@ -91,14 +86,14 @@ pub const Swapchain = struct {
         const config = root.config.vulkan.swapchain;
 
         self.extent = c.VkExtent2D{
-            .width = self.window.width,
-            .height = self.window.height,
+            .width = self.vulkan.window.width,
+            .height = self.vulkan.window.height,
         };
 
         self.image_format = c.VK_FORMAT_B8G8R8A8_SRGB;
         self.color_space = c.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 
-        const present_mode = for (self.surface.present_modes) |supported_mode| {
+        const present_mode = for (self.vulkan.surface.present_modes) |supported_mode| {
             const mode = @intFromEnum(config.present_mode);
             if (supported_mode == mode) {
                 break mode;
@@ -112,7 +107,7 @@ pub const Swapchain = struct {
             .sType = c.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
             .pNext = null,
             .flags = 0,
-            .surface = self.surface.handle,
+            .surface = self.vulkan.surface.handle,
             .minImageCount = 2,
             .imageFormat = self.image_format,
             .imageColorSpace = self.color_space,
@@ -122,19 +117,19 @@ pub const Swapchain = struct {
             .imageSharingMode = c.VK_SHARING_MODE_EXCLUSIVE,
             .queueFamilyIndexCount = 0,
             .pQueueFamilyIndices = null,
-            .preTransform = self.surface.capabilities.currentTransform,
+            .preTransform = self.vulkan.surface.capabilities.currentTransform,
             .compositeAlpha = c.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
             .presentMode = present_mode,
             .clipped = c.VK_TRUE,
             .oldSwapchain = null,
         };
 
-        try check(c.vkCreateSwapchainKHR.?(self.device.handle, &create_info, memory.vulkan_allocator, &self.handle));
+        try check(c.vkCreateSwapchainKHR.?(self.vulkan.device.handle, &create_info, memory.vulkan_allocator, &self.handle));
     }
 
     fn destroySwapchain(self: *Swapchain) void {
         if (self.handle != null) {
-            c.vkDestroySwapchainKHR.?(self.device.handle, self.handle, memory.vulkan_allocator);
+            c.vkDestroySwapchainKHR.?(self.vulkan.device.handle, self.handle, memory.vulkan_allocator);
             self.handle = null;
         }
     }
@@ -144,11 +139,11 @@ pub const Swapchain = struct {
         errdefer self.destroyImageViews(recreating);
 
         var image_count: u32 = 0;
-        try check(c.vkGetSwapchainImagesKHR.?(self.device.handle, self.handle, &image_count, null));
+        try check(c.vkGetSwapchainImagesKHR.?(self.vulkan.device.handle, self.handle, &image_count, null));
         self.max_inflight_frames = image_count;
 
         try self.images.resize(memory.default_allocator, image_count);
-        try check(c.vkGetSwapchainImagesKHR.?(self.device.handle, self.handle, &image_count, self.images.items.ptr));
+        try check(c.vkGetSwapchainImagesKHR.?(self.vulkan.device.handle, self.handle, &image_count, self.images.items.ptr));
 
         try self.image_views.ensureTotalCapacityPrecise(memory.default_allocator, image_count);
         for (self.images.items) |image| {
@@ -175,14 +170,14 @@ pub const Swapchain = struct {
             };
 
             var image_view: c.VkImageView = null;
-            try check(c.vkCreateImageView.?(self.device.handle, &create_info, memory.vulkan_allocator, &image_view));
+            try check(c.vkCreateImageView.?(self.vulkan.device.handle, &create_info, memory.vulkan_allocator, &image_view));
             try self.image_views.append(memory.default_allocator, image_view);
         }
     }
 
     fn destroyImageViews(self: *Swapchain, recreating: bool) void {
         for (self.image_views.items) |image_view| {
-            c.vkDestroyImageView.?(self.device.handle, image_view, memory.vulkan_allocator);
+            c.vkDestroyImageView.?(self.vulkan.device.handle, image_view, memory.vulkan_allocator);
         }
 
         if (recreating) {
@@ -199,7 +194,7 @@ pub const Swapchain = struct {
         errdefer self.destroyDepthStencilBuffer(recreating);
 
         self.depth_stencil_image_format = c.VK_FORMAT_D32_SFLOAT_S8_UINT;
-        try self.depth_stencil_image.init(self.vma, .{
+        try self.depth_stencil_image.init(self.vulkan, .{
             .format = self.depth_stencil_image_format,
             .extent = .{
                 .width = self.extent.width,
@@ -233,12 +228,12 @@ pub const Swapchain = struct {
             },
         };
 
-        try check(c.vkCreateImageView.?(self.device.handle, &image_view_create_info, memory.vulkan_allocator, &self.depth_stencil_image_view));
+        try check(c.vkCreateImageView.?(self.vulkan.device.handle, &image_view_create_info, memory.vulkan_allocator, &self.depth_stencil_image_view));
     }
 
     fn destroyDepthStencilBuffer(self: *Swapchain, recreating: bool) void {
         if (self.depth_stencil_image_view != null) {
-            c.vkDestroyImageView.?(self.device.handle, self.depth_stencil_image_view, memory.vulkan_allocator);
+            c.vkDestroyImageView.?(self.vulkan.device.handle, self.depth_stencil_image_view, memory.vulkan_allocator);
         }
         self.depth_stencil_image.deinit();
 
@@ -263,11 +258,11 @@ pub const Swapchain = struct {
             };
 
             var image_available_semaphore: c.VkSemaphore = null;
-            try check(c.vkCreateSemaphore.?(self.device.handle, semaphore_create_info, memory.vulkan_allocator, &image_available_semaphore));
+            try check(c.vkCreateSemaphore.?(self.vulkan.device.handle, semaphore_create_info, memory.vulkan_allocator, &image_available_semaphore));
             try self.image_available_semaphores.append(memory.default_allocator, image_available_semaphore);
 
             var frame_finished_semaphore: c.VkSemaphore = null;
-            try check(c.vkCreateSemaphore.?(self.device.handle, semaphore_create_info, memory.vulkan_allocator, &frame_finished_semaphore));
+            try check(c.vkCreateSemaphore.?(self.vulkan.device.handle, semaphore_create_info, memory.vulkan_allocator, &frame_finished_semaphore));
             try self.frame_finished_semaphores.append(memory.default_allocator, frame_finished_semaphore);
 
             const fence_create_info = &c.VkFenceCreateInfo{
@@ -277,22 +272,22 @@ pub const Swapchain = struct {
             };
 
             var frame_inflight_fence: c.VkFence = null;
-            try check(c.vkCreateFence.?(self.device.handle, fence_create_info, memory.vulkan_allocator, &frame_inflight_fence));
+            try check(c.vkCreateFence.?(self.vulkan.device.handle, fence_create_info, memory.vulkan_allocator, &frame_inflight_fence));
             try self.frame_inflight_fences.append(memory.default_allocator, frame_inflight_fence);
         }
     }
 
     fn destroyImageSynchronization(self: *Swapchain) void {
         for (self.image_available_semaphores.items) |semaphore| {
-            c.vkDestroySemaphore.?(self.device.handle, semaphore, memory.vulkan_allocator);
+            c.vkDestroySemaphore.?(self.vulkan.device.handle, semaphore, memory.vulkan_allocator);
         }
 
         for (self.frame_finished_semaphores.items) |semaphore| {
-            c.vkDestroySemaphore.?(self.device.handle, semaphore, memory.vulkan_allocator);
+            c.vkDestroySemaphore.?(self.vulkan.device.handle, semaphore, memory.vulkan_allocator);
         }
 
         for (self.frame_inflight_fences.items) |fence| {
-            c.vkDestroyFence.?(self.device.handle, fence, memory.vulkan_allocator);
+            c.vkDestroyFence.?(self.vulkan.device.handle, fence, memory.vulkan_allocator);
         }
 
         self.image_available_semaphores.deinit(memory.default_allocator);
@@ -304,7 +299,7 @@ pub const Swapchain = struct {
         log.info("Recreating swapchain...", .{});
         std.debug.assert(self.handle != null);
 
-        try self.surface.updateCapabilities();
+        try self.vulkan.surface.updateCapabilities();
 
         self.destroyDepthStencilBuffer(true);
         self.destroyImageViews(true);
@@ -322,16 +317,15 @@ pub const Swapchain = struct {
         inflight_fence: c.VkFence,
     } {
         std.debug.assert(self.handle != null);
-        std.debug.assert(self.device.handle != null);
 
-        try check(c.vkWaitForFences.?(self.device.handle, 1, &self.frame_inflight_fences.items[self.frame_index], c.VK_TRUE, std.math.maxInt(u64)));
+        try check(c.vkWaitForFences.?(self.vulkan.device.handle, 1, &self.frame_inflight_fences.items[self.frame_index], c.VK_TRUE, std.math.maxInt(u64)));
 
         var image_index: u32 = 0;
-        const result = c.vkAcquireNextImageKHR.?(self.device.handle, self.handle, std.math.maxInt(u64), self.image_available_semaphores.items[self.frame_index], null, &image_index);
+        const result = c.vkAcquireNextImageKHR.?(self.vulkan.device.handle, self.handle, std.math.maxInt(u64), self.image_available_semaphores.items[self.frame_index], null, &image_index);
 
         switch (result) {
             c.VK_SUCCESS, c.VK_SUBOPTIMAL_KHR => {
-                try check(c.vkResetFences.?(self.device.handle, 1, &self.frame_inflight_fences.items[self.frame_index]));
+                try check(c.vkResetFences.?(self.vulkan.device.handle, 1, &self.frame_inflight_fences.items[self.frame_index]));
 
                 return .{
                     .index = image_index,
@@ -416,9 +410,8 @@ pub const Swapchain = struct {
 
     pub fn present(self: *Swapchain, present_info: *const c.VkPresentInfoKHR) !void {
         std.debug.assert(self.handle != null);
-        std.debug.assert(self.device.handle != null);
 
-        const result = c.vkQueuePresentKHR.?(self.device.getQueue(.Graphics).handle, present_info);
+        const result = c.vkQueuePresentKHR.?(self.vulkan.device.getQueue(.Graphics).handle, present_info);
 
         switch (result) {
             c.VK_SUCCESS, c.VK_SUBOPTIMAL_KHR => {

@@ -5,6 +5,7 @@ const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
 const check = utility.vulkanCheckResult;
 
+const Vulkan = @import("../vulkan.zig").Vulkan;
 const Instance = @import("instance.zig").Instance;
 const PhysicalDevice = @import("physical_device.zig").PhysicalDevice;
 const Device = @import("device.zig").Device;
@@ -12,7 +13,7 @@ const Device = @import("device.zig").Device;
 pub const VmaAllocator = struct {
     handle: c.VmaAllocator = null,
 
-    pub fn init(self: *VmaAllocator, instance: *Instance, physical_device: *PhysicalDevice, device: *Device) !void {
+    pub fn init(self: *VmaAllocator, vulkan: *Vulkan) !void {
         log.info("Creating memory allocator...", .{});
         errdefer self.deinit();
 
@@ -47,14 +48,14 @@ pub const VmaAllocator = struct {
 
         const allocator_create_info = c.VmaAllocatorCreateInfo{
             .flags = 0,
-            .physicalDevice = physical_device.handle,
-            .device = device.handle,
+            .physicalDevice = vulkan.physical_device.handle,
+            .device = vulkan.device.handle,
             .preferredLargeHeapBlockSize = 0,
             .pAllocationCallbacks = memory.vulkan_allocator,
             .pDeviceMemoryCallbacks = null,
             .pHeapSizeLimit = null,
             .pVulkanFunctions = &vulkan_functions,
-            .instance = instance.handle,
+            .instance = vulkan.instance.handle,
             .vulkanApiVersion = Instance.api_version,
             .pTypeExternalMemoryHandleTypes = null,
         };

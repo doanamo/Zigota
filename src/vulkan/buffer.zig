@@ -5,32 +5,30 @@ const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
 const check = utility.vulkanCheckResult;
 
+const Vulkan = @import("../vulkan.zig").Vulkan;
 const VmaAllocator = @import("vma.zig").VmaAllocator;
 const Bindless = @import("bindless.zig").Bindless;
 
 pub const Buffer = struct {
+    vulkan: *Vulkan = undefined,
     handle: c.VkBuffer = null,
-    vma: *VmaAllocator = undefined,
-    bindless: ?*Bindless = undefined,
-
-    allocation: c.VmaAllocation = undefined,
-    usage_flags: c.VkBufferUsageFlags = undefined,
+    allocation: c.VmaAllocation = null,
     bindless_id: Bindless.IdentifierType = Bindless.invalid_id,
+    usage_flags: c.VkBufferUsageFlags = undefined,
     size: usize = undefined,
 
-    pub fn init(self: *Buffer, vma: *VmaAllocator, params: struct {
+    pub fn init(self: *Buffer, vulkan: *Vulkan, params: struct {
         size: usize,
         usage_flags: c.VkBufferUsageFlags,
         sharing_mode: c.VkSharingMode = c.VK_SHARING_MODE_EXCLUSIVE,
         memory_usage: c.VmaMemoryUsage = c.VMA_MEMORY_USAGE_AUTO,
         memory_flags: c.VmaPoolCreateFlags = 0,
         memory_priority: f32 = 0.0,
-        bindless: ?*Bindless = null,
+        bindless: bool = false,
     }) !void {
         errdefer self.deinit();
 
-        self.vma = vma;
-        self.bindless = params.bindless;
+        self.vulkan = vulkan;
         self.usage_flags = params.usage_flags;
         self.size = params.size;
 
@@ -57,13 +55,13 @@ pub const Buffer = struct {
         };
 
         var allocation_info: c.VmaAllocationInfo = undefined;
-        check(c.vmaCreateBuffer(vma.handle, &buffer_create_info, &allocation_create_info, &self.handle, &self.allocation, &allocation_info)) catch |err| {
+        check(c.vmaCreateBuffer(vulkan.vma.handle, &buffer_create_info, &allocation_create_info, &self.handle, &self.allocation, &allocation_info)) catch |err| {
             log.err("Failed to create buffer ({} bytes): {}", .{ params.size, err });
             return error.FailedToCreateBuffer;
         };
 
-        if (params.bindless != null) {
-            self.bindless_id = try params.bindless.?.registerResource(self);
+        if (params.bindless) {
+            self.bindless_id = try vulkan.bindless.registerResource(self);
             std.debug.assert(self.bindless_id != Bindless.invalid_id);
         }
 
@@ -72,29 +70,27 @@ pub const Buffer = struct {
 
     pub fn deinit(self: *Buffer) void {
         if (self.bindless_id != Bindless.invalid_id) {
-            self.bindless.?.unregisterResource(self, self.bindless_id);
+            self.vulkan.bindless.unregisterResource(self, self.bindless_id);
         }
 
         if (self.handle != null) {
-            c.vmaDestroyBuffer(self.vma.handle, self.handle, self.allocation);
+            c.vmaDestroyBuffer(self.vulkan.vma.handle, self.handle, self.allocation);
         }
 
         self.* = .{};
     }
 
     pub fn map(self: *Buffer) ![]u8 {
-        std.debug.assert(self.vma.handle != null);
         std.debug.assert(self.allocation != null);
 
         var data: ?*anyopaque = undefined;
-        try check(c.vmaMapMemory(self.vma.handle, self.allocation, &data));
+        try check(c.vmaMapMemory(self.vulkan.vma.handle, self.allocation, &data));
         return @as([*]u8, @ptrCast(@alignCast(data)))[0..self.size];
     }
 
     pub fn unmap(self: *Buffer) void {
-        std.debug.assert(self.vma.handle != null);
         std.debug.assert(self.allocation != null);
-        c.vmaUnmapMemory(self.vma.handle, self.allocation);
+        c.vmaUnmapMemory(self.vulkan.vma.handle, self.allocation);
     }
 
     pub fn upload(self: *Buffer, data: []const u8, offset: usize) !void {
@@ -106,9 +102,8 @@ pub const Buffer = struct {
     }
 
     pub fn flush(self: *Buffer, offset: usize, size: usize) !void {
-        std.debug.assert(self.vma.handle != null);
         std.debug.assert(self.allocation != null);
-        try check(c.vmaFlushAllocation(self.vma.handle, self.allocation, offset, size));
+        try check(c.vmaFlushAllocation(self.vulkan.vma.handle, self.allocation, offset, size));
     }
 
     pub fn getName(self: *Buffer) []const u8 {

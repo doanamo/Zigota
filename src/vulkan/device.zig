@@ -5,6 +5,7 @@ const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
 const check = utility.vulkanCheckResult;
 
+const Vulkan = @import("../vulkan.zig").Vulkan;
 const Instance = @import("instance.zig").Instance;
 const PhysicalDevice = @import("physical_device.zig").PhysicalDevice;
 const Surface = @import("surface.zig").Surface;
@@ -28,15 +29,15 @@ pub const Device = struct {
     handle: c.VkDevice = null,
     queues: [queue_type_count]Queue = undefined,
 
-    pub fn init(self: *Device, physical_device: *const PhysicalDevice, surface: *Surface) !void {
+    pub fn init(self: *Device, vulkan: *Vulkan) !void {
         errdefer self.deinit();
 
-        self.selectQueueFamilies(physical_device, surface) catch |err| {
+        self.selectQueueFamilies(vulkan) catch |err| {
             log.err("Failed to select queue families: {}", .{err});
             return error.FailedToSelectQueueFamilies;
         };
 
-        self.createLogicalDevice(physical_device) catch |err| {
+        self.createLogicalDevice(vulkan) catch |err| {
             log.err("Failed to create logical device: {}", .{err});
             return error.FailedToCreateLogicalDevice;
         };
@@ -48,15 +49,15 @@ pub const Device = struct {
         self.* = .{};
     }
 
-    fn selectQueueFamilies(self: *Device, physical_device: *const PhysicalDevice, surface: *const Surface) !void {
+    fn selectQueueFamilies(self: *Device, vulkan: *Vulkan) !void {
         log.info("Selecting queue families...", .{});
 
         var queue_family_count: u32 = 0;
-        c.vkGetPhysicalDeviceQueueFamilyProperties.?(physical_device.handle, &queue_family_count, null);
+        c.vkGetPhysicalDeviceQueueFamilyProperties.?(vulkan.physical_device.handle, &queue_family_count, null);
 
         const queue_families = try memory.default_allocator.alloc(c.VkQueueFamilyProperties, queue_family_count);
         defer memory.default_allocator.free(queue_families);
-        c.vkGetPhysicalDeviceQueueFamilyProperties.?(physical_device.handle, &queue_family_count, queue_families.ptr);
+        c.vkGetPhysicalDeviceQueueFamilyProperties.?(vulkan.physical_device.handle, &queue_family_count, queue_families.ptr);
 
         var queue_graphics = self.getQueue(.Graphics);
         for (queue_families, 0..) |queue_family, i| {
@@ -64,7 +65,7 @@ pub const Device = struct {
                 continue;
 
             var present_support: c.VkBool32 = c.VK_FALSE;
-            try check(c.vkGetPhysicalDeviceSurfaceSupportKHR.?(physical_device.handle, @intCast(i), surface.handle, &present_support));
+            try check(c.vkGetPhysicalDeviceSurfaceSupportKHR.?(vulkan.physical_device.handle, @intCast(i), vulkan.surface.handle, &present_support));
             if (present_support == c.VK_FALSE)
                 continue;
 
@@ -123,7 +124,7 @@ pub const Device = struct {
         }
     }
 
-    fn createLogicalDevice(self: *Device, physical_device: *const PhysicalDevice) !void {
+    fn createLogicalDevice(self: *Device, vulkan: *Vulkan) !void {
         log.info("Creating logical device...", .{});
 
         var queue_graphics = self.getQueue(.Graphics);
@@ -212,7 +213,7 @@ pub const Device = struct {
             .pEnabledFeatures = &features,
         };
 
-        try check(c.vkCreateDevice.?(physical_device.handle, &create_info, memory.vulkan_allocator, &self.handle));
+        try check(c.vkCreateDevice.?(vulkan.physical_device.handle, &create_info, memory.vulkan_allocator, &self.handle));
         c.volkLoadDevice(self.handle);
 
         c.vkGetDeviceQueue.?(self.handle, queue_graphics.index, 0, &queue_graphics.handle);

@@ -77,7 +77,7 @@ pub const Renderer = struct {
         log.info("Creating pipeline...", .{});
 
         var builder = PipelineBuilder{};
-        try builder.init(&self.vulkan.device, &self.vulkan.bindless);
+        try builder.init(&self.vulkan);
         defer builder.deinit();
 
         try builder.loadShaderModule(.Vertex, "data/shaders/simple.vert.spv");
@@ -102,25 +102,25 @@ pub const Renderer = struct {
         try self.frames.ensureTotalCapacityPrecise(memory.default_allocator, self.vulkan.swapchain.max_inflight_frames);
         for (0..self.vulkan.swapchain.max_inflight_frames) |_| {
             var command_pool = CommandPool{};
-            try command_pool.init(&self.vulkan.device, .{
+            try command_pool.init(&self.vulkan, .{
                 .queue = .Graphics,
                 .flags = c.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
             });
             errdefer command_pool.deinit();
 
             var command_buffer = CommandBuffer{};
-            try command_buffer.init(&self.vulkan.device, .{
+            try command_buffer.init(&self.vulkan, .{
                 .command_pool = &command_pool,
                 .level = c.VK_COMMAND_BUFFER_LEVEL_PRIMARY,
             });
-            errdefer command_buffer.deinit(&self.vulkan.device, &command_pool);
+            errdefer command_buffer.deinit();
 
             var uniform_buffer = Buffer{};
-            try uniform_buffer.init(&self.vulkan.vma, .{
+            try uniform_buffer.init(&self.vulkan, .{
                 .size = @sizeOf(VertexTransformUniform),
                 .usage_flags = c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 .memory_flags = c.VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | c.VMA_ALLOCATION_CREATE_MAPPED_BIT,
-                .bindless = &self.vulkan.bindless,
+                .bindless = true,
             });
             errdefer uniform_buffer.deinit();
 
@@ -135,7 +135,7 @@ pub const Renderer = struct {
     fn destroyFrames(self: *Renderer) void {
         for (self.frames.items) |*frame| {
             frame.uniform_buffer.deinit();
-            frame.command_buffer.deinit(&self.vulkan.device, &frame.command_pool);
+            frame.command_buffer.deinit();
             frame.command_pool.deinit();
         }
 
@@ -145,7 +145,7 @@ pub const Renderer = struct {
     fn createAssets(self: *Renderer) !void {
         log.info("Creating mesh...", .{});
 
-        self.mesh.init(&self.vulkan.transfer, "data/meshes/monkey.bin") catch |err| {
+        self.mesh.init(&self.vulkan, "data/meshes/monkey.bin") catch |err| {
             log.err("Failed to load mesh ({})", .{err});
             return error.FailedToLoadMesh;
         };
@@ -156,7 +156,7 @@ pub const Renderer = struct {
     }
 
     fn updateUniformBuffer(self: *Renderer, uniform_buffer: *Buffer) !void {
-        const window: *Window = self.vulkan.swapchain.window;
+        const window: *Window = self.vulkan.window;
         const width: f32 = @floatFromInt(window.width);
         const height: f32 = @floatFromInt(window.height);
 

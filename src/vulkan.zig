@@ -20,6 +20,8 @@ pub const Vulkan = struct {
         transfer: Transfer.Config,
     };
 
+    window: *Window = undefined,
+
     instance: Instance = .{},
     physical_device: PhysicalDevice = .{},
     surface: Surface = .{},
@@ -33,42 +35,44 @@ pub const Vulkan = struct {
         log.info("Initializing...", .{});
         errdefer self.deinit();
 
+        self.window = window;
+
         self.instance.init() catch |err| {
             log.err("Failed to initialize instance: {}", .{err});
             return error.FailedToInitializeInstance;
         };
 
-        self.physical_device.init(&self.instance) catch |err| {
+        self.physical_device.init(self) catch |err| {
             log.err("Failed to initialize physical device: {}", .{err});
             return error.FailedToInitializePhysicalDevice;
         };
 
-        self.surface.init(window, &self.instance, &self.physical_device) catch |err| {
+        self.surface.init(self) catch |err| {
             log.err("Failed to initialize surface: {}", .{err});
             return error.FailedToInitializeSurface;
         };
 
-        self.device.init(&self.physical_device, &self.surface) catch |err| {
+        self.device.init(self) catch |err| {
             log.err("Failed to initialize device: {}", .{err});
             return error.FailedToInitializeDevice;
         };
 
-        self.vma.init(&self.instance, &self.physical_device, &self.device) catch |err| {
+        self.vma.init(self) catch |err| {
             log.err("Failed to initialize allocator: {}", .{err});
             return error.FailedToInitializeAllocator;
         };
 
-        self.swapchain.init(window, &self.surface, &self.device, &self.vma) catch |err| {
+        self.swapchain.init(self) catch |err| {
             log.err("Failed to initialize swapchain: {}", .{err});
             return error.FailedToInitializeSwapchain;
         };
 
-        self.bindless.init(&self.device) catch |err| {
+        self.bindless.init(self) catch |err| {
             log.err("Failed to initialize bindless: {}", .{err});
             return error.FailedToInitializeBindless;
         };
 
-        self.transfer.init(&self.device, &self.vma, &self.bindless) catch |err| {
+        self.transfer.init(self) catch |err| {
             log.err("Failed to initialize transfer: {}", .{err});
             return error.FailedToInitializeTransfer;
         };
@@ -76,8 +80,8 @@ pub const Vulkan = struct {
 
     pub fn deinit(self: *Vulkan) void {
         log.info("Deinitializing...", .{});
-        self.device.waitIdle();
 
+        self.device.waitIdle();
         self.transfer.deinit();
         self.bindless.deinit();
         self.swapchain.deinit();
