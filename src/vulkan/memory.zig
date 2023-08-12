@@ -1,7 +1,7 @@
 pub usingnamespace @import("../memory.zig");
 
 const std = @import("std");
-const c = @import("../c.zig");
+const c = @import("../c/c.zig");
 
 pub const vulkan_allocator = &c.VkAllocationCallbacks{
     .pUserData = null,

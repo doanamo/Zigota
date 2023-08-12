@@ -4,7 +4,7 @@ const utility = @import("utility.zig");
 const log = std.log.scoped(.Config);
 
 const WindowConfig = @import("glfw/window.zig").Window.Config;
-const VulkanConfig = @import("vulkan.zig").Vulkan.Config;
+const VulkanConfig = @import("vulkan/vulkan.zig").Vulkan.Config;
 
 pub const Config = struct {
     const path = "config.json";

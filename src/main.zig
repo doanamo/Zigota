@@ -1,10 +1,10 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const c = @import("c.zig");
+const c = @import("c/c.zig");
 const memory = @import("memory.zig");
-const glfw = @import("glfw.zig");
 const log = std.log.scoped(.Main);
 
+const glfw = @import("glfw/glfw.zig");
 const Config = @import("config.zig").Config;
 const Application = @import("application.zig").Application;
 

@@ -1,5 +1,5 @@
 const std = @import("std");
-const c = @import("c.zig");
+const c = @import("../c/c.zig");
 const log = std.log.scoped(.GLFW);
 
 pub fn init() !void {

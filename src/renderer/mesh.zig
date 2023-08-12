@@ -1,13 +1,14 @@
 const std = @import("std");
-const c = @import("../c.zig");
+const c = @import("../c/c.zig");
 const memory = @import("../memory.zig");
 const utility = @import("../utility.zig");
-const vertex_attributes = @import("../vulkan/vertex_attributes.zig");
 const log = std.log.scoped(.Renderer);
 
-const Vulkan = @import("../vulkan.zig").Vulkan;
+const Vulkan = @import("../vulkan/vulkan.zig").Vulkan;
 const Transfer = @import("../vulkan/transfer.zig").Transfer;
 const Buffer = @import("../vulkan/buffer.zig").Buffer;
+
+const vertex_attributes = @import("../vulkan/vertex_attributes.zig");
 const VertexAttributeType = vertex_attributes.VertexAttributeType;
 const VertexAttributeFlags = vertex_attributes.VertexAttributeFlags;
 

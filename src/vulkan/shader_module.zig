@@ -1,12 +1,12 @@
 const std = @import("std");
-const c = @import("../c.zig");
+const c = @import("../c/c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
 const check = utility.vulkanCheckResult;
 const checkSpv = utility.spvReflectCheckResult;
 
-const Vulkan = @import("../vulkan.zig").Vulkan;
+const Vulkan = @import("vulkan.zig").Vulkan;
 const Device = @import("device.zig").Device;
 
 pub const ShaderStage = enum(c.VkShaderStageFlagBits) {

@@ -5,7 +5,7 @@ const memory = @import("memory.zig");
 const log = std.log.scoped(.Application);
 
 const Window = @import("glfw/window.zig").Window;
-const Renderer = @import("renderer.zig").Renderer;
+const Renderer = @import("renderer/renderer.zig").Renderer;
 
 pub const Application = struct {
     window: Window = .{},

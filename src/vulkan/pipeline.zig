@@ -1,12 +1,12 @@
 const std = @import("std");
-const c = @import("../c.zig");
+const c = @import("../c/c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const vertex_attributes = @import("vertex_attributes.zig");
 const log = std.log.scoped(.Vulkan);
 const check = utility.vulkanCheckResult;
 
-const Vulkan = @import("../vulkan.zig").Vulkan;
+const Vulkan = @import("vulkan.zig").Vulkan;
 const Device = @import("device.zig").Device;
 const Swapchain = @import("swapchain.zig").Swapchain;
 const Bindless = @import("bindless.zig").Bindless;

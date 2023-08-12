@@ -1,19 +1,19 @@
-const c = @import("c.zig");
 const std = @import("std");
-const utility = @import("vulkan/utility.zig");
-const memory = @import("vulkan/memory.zig");
+const c = @import("../c/c.zig");
+const utility = @import("utility.zig");
+const memory = @import("memory.zig");
 const log = std.log.scoped(.Vulkan);
 
-const Window = @import("glfw/window.zig").Window;
-const Instance = @import("vulkan/instance.zig").Instance;
-const PhysicalDevice = @import("vulkan/physical_device.zig").PhysicalDevice;
-const Surface = @import("vulkan/surface.zig").Surface;
-const Device = @import("vulkan/device.zig").Device;
-const Swapchain = @import("vulkan/swapchain.zig").Swapchain;
-const VmaAllocator = @import("vulkan/vma.zig").VmaAllocator;
-const Transfer = @import("vulkan/transfer.zig").Transfer;
-const Bindless = @import("vulkan/bindless.zig").Bindless;
-const CommandBuffer = @import("vulkan/command_buffer.zig").CommandBuffer;
+const Window = @import("../glfw/window.zig").Window;
+const Instance = @import("instance.zig").Instance;
+const PhysicalDevice = @import("physical_device.zig").PhysicalDevice;
+const Surface = @import("surface.zig").Surface;
+const Device = @import("device.zig").Device;
+const Swapchain = @import("swapchain.zig").Swapchain;
+const VmaAllocator = @import("vma.zig").VmaAllocator;
+const Transfer = @import("transfer.zig").Transfer;
+const Bindless = @import("bindless.zig").Bindless;
+const CommandBuffer = @import("command_buffer.zig").CommandBuffer;
 
 pub const Vulkan = struct {
     pub const Config = struct {

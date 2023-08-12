@@ -1,11 +1,11 @@
 const std = @import("std");
-const c = @import("../c.zig");
+const c = @import("../c/c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
 const check = utility.vulkanCheckResult;
 
-const Vulkan = @import("../vulkan.zig").Vulkan;
+const Vulkan = @import("vulkan.zig").Vulkan;
 const Window = @import("../glfw/window.zig").Window;
 const Instance = @import("instance.zig").Instance;
 const PhysicalDevice = @import("physical_device.zig").PhysicalDevice;

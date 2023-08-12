@@ -1,23 +1,24 @@
 const std = @import("std");
-const c = @import("c.zig");
-const math = @import("math.zig");
-const memory = @import("vulkan/memory.zig");
-const utility = @import("vulkan/utility.zig");
-const vertex_attributes = @import("vulkan/vertex_attributes.zig");
+const c = @import("../c/c.zig");
+const math = @import("../math.zig");
+const memory = @import("../vulkan/memory.zig");
+const utility = @import("../vulkan/utility.zig");
 const log = std.log.scoped(.Renderer);
 const check = utility.vulkanCheckResult;
 
-const Window = @import("glfw/window.zig").Window;
-const Vulkan = @import("vulkan.zig").Vulkan;
-const CommandPool = @import("vulkan/command_pool.zig").CommandPool;
-const CommandBuffer = @import("vulkan/command_buffer.zig").CommandBuffer;
-const Buffer = @import("vulkan/buffer.zig").Buffer;
-const DescriptorPool = @import("vulkan/descriptor_pool.zig").DescriptorPool;
-const ShaderModule = @import("vulkan/shader_module.zig").ShaderModule;
-const PipelineBuilder = @import("vulkan/pipeline.zig").PipelineBuilder;
-const Pipeline = @import("vulkan/pipeline.zig").Pipeline;
-const VertexTransformUniform = @import("renderer/uniform_types.zig").VertexTransformUniform;
-const Mesh = @import("renderer/mesh.zig").Mesh;
+const Window = @import("../glfw/window.zig").Window;
+const Vulkan = @import("../vulkan/vulkan.zig").Vulkan;
+const CommandPool = @import("../vulkan/command_pool.zig").CommandPool;
+const CommandBuffer = @import("../vulkan/command_buffer.zig").CommandBuffer;
+const Buffer = @import("../vulkan/buffer.zig").Buffer;
+const DescriptorPool = @import("../vulkan/descriptor_pool.zig").DescriptorPool;
+const ShaderModule = @import("../vulkan/shader_module.zig").ShaderModule;
+const PipelineBuilder = @import("../vulkan/pipeline.zig").PipelineBuilder;
+const Pipeline = @import("../vulkan/pipeline.zig").Pipeline;
+const vertex_attributes = @import("../vulkan/vertex_attributes.zig");
+
+const VertexTransformUniform = @import("uniform_types.zig").VertexTransformUniform;
+const Mesh = @import("mesh.zig").Mesh;
 
 pub const Renderer = struct {
     const Frame = struct {

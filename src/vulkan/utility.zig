@@ -1,7 +1,7 @@
 pub usingnamespace @import("../utility.zig");
 
 const std = @import("std");
-const c = @import("../c.zig");
+const c = @import("../c/c.zig");
 
 pub fn vulkanCheckResult(result: c.VkResult) !void {
     switch (result) {
