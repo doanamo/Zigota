@@ -8,6 +8,7 @@
             "program": "${workspaceFolder}/zig-out/bin/debug/game.exe",
             "args": [],
             "cwd": "${workspaceFolder}/deploy/",
+            "preLaunchTask": "build-debug",
             "console": "internalConsole",
         },
         {
@@ -17,6 +18,7 @@
             "program": "${workspaceFolder}/zig-out/bin/release-safe/game.exe",
             "args": [],
             "cwd": "${workspaceFolder}/deploy/",
+            "preLaunchTask": "build-release-safe",
             "console": "internalConsole",
         },
         {
@@ -26,6 +28,7 @@
             "program": "${workspaceFolder}/zig-out/bin/release-fast/game.exe",
             "args": [],
             "cwd": "${workspaceFolder}/deploy/",
+            "preLaunchTask": "build-release-fast",
             "console": "internalConsole",
         },
         {
