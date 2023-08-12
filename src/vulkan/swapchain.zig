@@ -310,12 +310,15 @@ pub const Swapchain = struct {
         try self.createDepthStencilBuffer(true);
     }
 
-    pub fn acquireNextImage(self: *Swapchain) !struct {
+    pub const ImageInfo = struct {
         index: u32,
+        frame_index: u32,
         available_semaphore: c.VkSemaphore,
         finished_semaphore: c.VkSemaphore,
         inflight_fence: c.VkFence,
-    } {
+    };
+
+    pub fn acquireNextImage(self: *Swapchain) !ImageInfo {
         std.debug.assert(self.handle != null);
 
         try check(c.vkWaitForFences.?(self.vulkan.device.handle, 1, &self.frame_inflight_fences.items[self.frame_index], c.VK_TRUE, std.math.maxInt(u64)));
@@ -329,6 +332,7 @@ pub const Swapchain = struct {
 
                 return .{
                     .index = image_index,
+                    .frame_index = self.frame_index,
                     .available_semaphore = self.image_available_semaphores.items[self.frame_index],
                     .finished_semaphore = self.frame_finished_semaphores.items[self.frame_index],
                     .inflight_fence = self.frame_inflight_fences.items[self.frame_index],

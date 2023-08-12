@@ -13,6 +13,7 @@ const Swapchain = @import("vulkan/swapchain.zig").Swapchain;
 const VmaAllocator = @import("vulkan/vma.zig").VmaAllocator;
 const Transfer = @import("vulkan/transfer.zig").Transfer;
 const Bindless = @import("vulkan/bindless.zig").Bindless;
+const CommandBuffer = @import("vulkan/command_buffer.zig").CommandBuffer;
 
 pub const Vulkan = struct {
     pub const Config = struct {
@@ -96,5 +97,96 @@ pub const Vulkan = struct {
     pub fn recreateSwapchain(self: *Vulkan) !void {
         self.device.waitIdle();
         try self.swapchain.recreate();
+    }
+
+    pub fn beginFrame(self: *Vulkan) !Swapchain.ImageInfo {
+        try self.transfer.submit();
+        self.bindless.updateDescriptorSet();
+
+        return self.swapchain.acquireNextImage() catch |err| {
+            if (err == error.SwapchainOutOfDate) {
+                try self.recreateSwapchain();
+                return error.SkipFrameRender;
+            }
+            return err;
+        };
+    }
+
+    pub fn endFrame(self: *Vulkan, params: struct {
+        swapchain_image: *const Swapchain.ImageInfo,
+        command_buffers: []*const CommandBuffer,
+    }) !void {
+        const submit_wait_semaphores = [_]c.VkSemaphore{
+            self.transfer.finished_semaphore,
+            params.swapchain_image.available_semaphore,
+        };
+
+        const submit_wait_sempahore_values = [_]u64{
+            self.transfer.finished_semaphore_index,
+            0,
+        };
+
+        const submit_wait_stages = [_]c.VkPipelineStageFlags{
+            c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        };
+
+        var submit_command_buffers = try memory.frame_allocator.alloc(c.VkCommandBuffer, params.command_buffers.len);
+        defer memory.frame_allocator.free(submit_command_buffers);
+
+        for (params.command_buffers, 0..) |command_buffer, i| {
+            submit_command_buffers[i] = command_buffer.handle;
+        }
+
+        const submit_signal_semaphores = [_]c.VkSemaphore{
+            params.swapchain_image.finished_semaphore,
+        };
+
+        const timeline_semaphore_submit_info = c.VkTimelineSemaphoreSubmitInfo{
+            .sType = c.VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+            .pNext = null,
+            .waitSemaphoreValueCount = submit_wait_sempahore_values.len,
+            .pWaitSemaphoreValues = &submit_wait_sempahore_values,
+            .signalSemaphoreValueCount = 0,
+            .pSignalSemaphoreValues = null,
+        };
+
+        const submit_info = c.VkSubmitInfo{
+            .sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .pNext = &timeline_semaphore_submit_info,
+            .waitSemaphoreCount = submit_wait_semaphores.len,
+            .pWaitSemaphores = &submit_wait_semaphores,
+            .pWaitDstStageMask = &submit_wait_stages,
+            .commandBufferCount = @intCast(submit_command_buffers.len),
+            .pCommandBuffers = submit_command_buffers.ptr,
+            .signalSemaphoreCount = submit_signal_semaphores.len,
+            .pSignalSemaphores = &submit_signal_semaphores,
+        };
+
+        try self.device.submit(.{
+            .queue_type = .Graphics,
+            .submit_count = 1,
+            .submit_info = &submit_info,
+            .fence = params.swapchain_image.inflight_fence,
+        });
+
+        const present_info = c.VkPresentInfoKHR{
+            .sType = c.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+            .pNext = null,
+            .waitSemaphoreCount = submit_signal_semaphores.len,
+            .pWaitSemaphores = &submit_signal_semaphores,
+            .swapchainCount = 1,
+            .pSwapchains = &self.swapchain.handle,
+            .pImageIndices = &params.swapchain_image.index,
+            .pResults = null,
+        };
+
+        self.swapchain.present(&present_info) catch |err| {
+            if (err == error.SwapchainOutOfDate or err == error.SwapchainSuboptimal) {
+                try self.recreateSwapchain();
+                return error.SkipFrameRender;
+            }
+            return err;
+        };
     }
 };

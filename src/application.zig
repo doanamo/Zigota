@@ -63,7 +63,12 @@ pub const Application = struct {
 
     pub fn render(self: *Application) !void {
         if (!self.window.minimized) {
-            try self.renderer.render();
+            self.renderer.render() catch |err| {
+                switch (err) {
+                    error.SkipFrameRender => return,
+                    else => return err,
+                }
+            };
         } else {
             std.time.sleep(100 * std.time.ns_per_ms);
         }

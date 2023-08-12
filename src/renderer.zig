@@ -179,9 +179,8 @@ pub const Renderer = struct {
 
     fn recordCommandBuffer(self: *Renderer, frame: *Frame, image_index: u32) !void {
         try frame.command_pool.reset();
-        var command_buffer = &frame.command_buffer;
-        var uniform_buffer = &frame.uniform_buffer;
 
+        var command_buffer = &frame.command_buffer;
         try check(c.vkBeginCommandBuffer.?(command_buffer.handle, &c.VkCommandBufferBeginInfo{
             .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
             .pNext = null,
@@ -227,7 +226,7 @@ pub const Renderer = struct {
             },
         };
 
-        const rendering_info = c.VkRenderingInfo{
+        c.vkCmdBeginRendering.?(command_buffer.handle, &c.VkRenderingInfo{
             .sType = c.VK_STRUCTURE_TYPE_RENDERING_INFO,
             .pNext = null,
             .flags = 0,
@@ -244,15 +243,13 @@ pub const Renderer = struct {
             .pColorAttachments = &color_attachment_info,
             .pDepthAttachment = &depth_stencil_attachment_info,
             .pStencilAttachment = &depth_stencil_attachment_info,
-        };
+        });
 
-        c.vkCmdBeginRendering.?(command_buffer.handle, &rendering_info);
         c.vkCmdBindPipeline.?(command_buffer.handle, c.VK_PIPELINE_BIND_POINT_GRAPHICS, self.pipeline.handle);
-
         c.vkCmdBindDescriptorSets.?(command_buffer.handle, c.VK_PIPELINE_BIND_POINT_GRAPHICS, self.vulkan.bindless.pipeline_layout, 0, 1, &self.vulkan.bindless.descriptor_set, 0, null);
 
         const push_constants = .{
-            .uniform_buffer_id = uniform_buffer.bindless_id,
+            .uniform_buffer_id = frame.uniform_buffer.bindless_id,
         };
 
         c.vkCmdPushConstants.?(command_buffer.handle, self.vulkan.bindless.pipeline_layout, c.VK_SHADER_STAGE_ALL, 0, @sizeOf(@TypeOf(push_constants)), &push_constants);
@@ -293,91 +290,19 @@ pub const Renderer = struct {
     }
 
     pub fn render(self: *Renderer) !void {
-        try self.vulkan.transfer.submit();
-        self.vulkan.bindless.updateDescriptorSet();
+        const swapchain_image = try self.vulkan.beginFrame();
 
-        const image_next = self.vulkan.swapchain.acquireNextImage() catch |err| {
-            if (err == error.SwapchainOutOfDate) {
-                try self.recreateSwapchain();
-                return;
-            }
-            return err;
-        };
-
-        const frame_index = self.vulkan.swapchain.frame_index;
-        var frame = &self.frames.items[frame_index];
-
+        var frame = &self.frames.items[swapchain_image.frame_index];
         try self.updateUniformBuffer(&frame.uniform_buffer);
-        try self.recordCommandBuffer(frame, image_next.index);
+        try self.recordCommandBuffer(frame, swapchain_image.index);
 
-        const submit_wait_semaphores = [_]c.VkSemaphore{
-            self.vulkan.transfer.finished_semaphore,
-            image_next.available_semaphore,
+        var command_buffers = [_]*const CommandBuffer{
+            &frame.command_buffer,
         };
 
-        const submit_wait_sempahore_values = [_]u64{
-            self.vulkan.transfer.finished_semaphore_index,
-            0,
-        };
-
-        const submit_wait_stages = [_]c.VkPipelineStageFlags{
-            c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-            c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        };
-
-        const submit_command_buffers = [_]c.VkCommandBuffer{
-            frame.command_buffer.handle,
-        };
-
-        const submit_signal_semaphores = [_]c.VkSemaphore{
-            image_next.finished_semaphore,
-        };
-
-        const timeline_semaphore_submit_info = c.VkTimelineSemaphoreSubmitInfo{
-            .sType = c.VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
-            .pNext = null,
-            .waitSemaphoreValueCount = submit_wait_sempahore_values.len,
-            .pWaitSemaphoreValues = &submit_wait_sempahore_values,
-            .signalSemaphoreValueCount = 0,
-            .pSignalSemaphoreValues = null,
-        };
-
-        const submit_info = c.VkSubmitInfo{
-            .sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO,
-            .pNext = &timeline_semaphore_submit_info,
-            .waitSemaphoreCount = submit_wait_semaphores.len,
-            .pWaitSemaphores = &submit_wait_semaphores,
-            .pWaitDstStageMask = &submit_wait_stages,
-            .commandBufferCount = submit_command_buffers.len,
-            .pCommandBuffers = &submit_command_buffers,
-            .signalSemaphoreCount = submit_signal_semaphores.len,
-            .pSignalSemaphores = &submit_signal_semaphores,
-        };
-
-        try self.vulkan.device.submit(.{
-            .queue_type = .Graphics,
-            .submit_count = 1,
-            .submit_info = &submit_info,
-            .fence = image_next.inflight_fence,
+        try self.vulkan.endFrame(.{
+            .swapchain_image = &swapchain_image,
+            .command_buffers = &command_buffers,
         });
-
-        const present_info = c.VkPresentInfoKHR{
-            .sType = c.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-            .pNext = null,
-            .waitSemaphoreCount = submit_signal_semaphores.len,
-            .pWaitSemaphores = &submit_signal_semaphores,
-            .swapchainCount = 1,
-            .pSwapchains = &self.vulkan.swapchain.handle,
-            .pImageIndices = &image_next.index,
-            .pResults = null,
-        };
-
-        self.vulkan.swapchain.present(&present_info) catch |err| {
-            if (err == error.SwapchainOutOfDate or err == error.SwapchainSuboptimal) {
-                try self.recreateSwapchain();
-                return;
-            }
-            return err;
-        };
     }
 };
