@@ -292,7 +292,9 @@ pub const Renderer = struct {
     pub fn render(self: *Renderer) !void {
         const swapchain_image = try self.vulkan.beginFrame();
 
+        std.debug.assert(swapchain_image.frame_index < self.frames.items.len);
         var frame = &self.frames.items[swapchain_image.frame_index];
+
         try self.updateUniformBuffer(&frame.uniform_buffer);
         try self.recordCommandBuffer(frame, swapchain_image.index);
 
