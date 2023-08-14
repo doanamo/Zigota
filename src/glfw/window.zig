@@ -129,9 +129,10 @@ pub const Window = struct {
     fn framebufferSizeCallback(window: ?*c.GLFWwindow, width: c_int, height: c_int) callconv(.C) void {
         var self = @as(?*Window, @ptrCast(@alignCast(c.glfwGetWindowUserPointer(window)))) orelse unreachable;
 
+        self.width = @intCast(width);
+        self.height = @intCast(height);
+
         if (width > 0 and height > 0) {
-            self.width = @intCast(width);
-            self.height = @intCast(height);
             self.resized = !self.minimized;
             self.minimized = false;
         } else {
