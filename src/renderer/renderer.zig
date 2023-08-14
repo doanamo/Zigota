@@ -18,6 +18,7 @@ const Pipeline = @import("../vulkan/pipeline.zig").Pipeline;
 const vertex_attributes = @import("../vulkan/vertex_attributes.zig");
 
 const VertexTransformUniform = @import("uniform_types.zig").VertexTransformUniform;
+const Camera = @import("camera.zig").Camera;
 const Mesh = @import("mesh.zig").Mesh;
 
 pub const Renderer = struct {
@@ -31,6 +32,7 @@ pub const Renderer = struct {
     pipeline: Pipeline = .{},
     frames: std.ArrayListUnmanaged(Frame) = .{},
 
+    camera: Camera = .{},
     mesh: Mesh = .{},
     time: f32 = 0.0,
 
@@ -53,9 +55,9 @@ pub const Renderer = struct {
             return error.FailedToCreateFrames;
         };
 
-        self.createAssets() catch |err| {
-            log.err("Failed to create mesh: {}", .{err});
-            return error.FailedToCreateMesh;
+        self.createScene() catch |err| {
+            log.err("Failed to create scene: {}", .{err});
+            return error.FailedToCreateScene;
         };
     }
 
@@ -63,7 +65,7 @@ pub const Renderer = struct {
         log.info("Deinitializing...", .{});
 
         self.vulkan.device.waitIdle();
-        self.destroyAssets();
+        self.destroyScene();
         self.destroyFrames();
         self.destroyPipeline();
         self.vulkan.deinit();
@@ -143,8 +145,15 @@ pub const Renderer = struct {
         self.frames.deinit(memory.default_allocator);
     }
 
-    fn createAssets(self: *Renderer) !void {
-        log.info("Creating mesh...", .{});
+    fn createScene(self: *Renderer) !void {
+        log.info("Creating scene...", .{});
+
+        const width: f32 = @floatFromInt(self.vulkan.window.width);
+        const height: f32 = @floatFromInt(self.vulkan.window.height);
+
+        self.camera.aspect_ratio = width / height;
+        self.camera.position = math.Vec3{ 0.0, -1.0, 0.0 };
+        self.camera.forward = math.Vec3{ 0.0, 1.0, 0.0 };
 
         self.mesh.init(&self.vulkan, "data/meshes/monkey.bin") catch |err| {
             log.err("Failed to load mesh ({})", .{err});
@@ -152,26 +161,18 @@ pub const Renderer = struct {
         };
     }
 
-    fn destroyAssets(self: *Renderer) void {
+    fn destroyScene(self: *Renderer) void {
         self.mesh.deinit();
     }
 
     fn updateUniformBuffer(self: *Renderer, uniform_buffer: *Buffer) !void {
-        const window: *Window = self.vulkan.window;
-        const width: f32 = @floatFromInt(window.width);
-        const height: f32 = @floatFromInt(window.height);
-
-        const camera_position = math.Vec3{ 0.0, -1.0, 0.5 };
-        const camera_target = math.Vec3{ 0.0, 0.0, 0.0 };
-        const camera_up = math.Vec3{ 0.0, 0.0, 1.0 };
-
         const uniform_object = VertexTransformUniform{
             .model = math.mul(
                 math.scaling(math.splat(math.Vec3, 0.5)),
                 math.rotation(math.Vec3{ 0.0, 0.0, math.radians(30.0) * self.time }),
             ),
-            .view = math.lookAt(camera_position, camera_target, camera_up),
-            .projection = math.perspectiveFov(math.radians(70.0), width / height, 0.01, 1000.0),
+            .view = self.camera.getView(),
+            .projection = self.camera.getProjection(),
         };
 
         try uniform_buffer.upload(std.mem.asBytes(&uniform_object), 0);
