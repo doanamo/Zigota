@@ -72,10 +72,6 @@ pub const Renderer = struct {
         self.* = .{};
     }
 
-    pub fn recreateSwapchain(self: *Renderer) !void {
-        try self.vulkan.recreateSwapchain();
-    }
-
     fn createPipeline(self: *Renderer) !void {
         log.info("Creating pipeline...", .{});
 
@@ -285,6 +281,18 @@ pub const Renderer = struct {
 
         c.vkCmdEndRendering.?(command_buffer.handle);
         try check(c.vkEndCommandBuffer.?(command_buffer.handle));
+    }
+
+    pub fn handleResize(self: *Renderer) !void {
+        const width: f32 = @floatFromInt(self.vulkan.window.width);
+        const height: f32 = @floatFromInt(self.vulkan.window.height);
+
+        if (width > 0 and height > 0) {
+            self.camera.aspect_ratio = width / height;
+            self.camera.recalculate_projection = true;
+
+            try self.vulkan.recreateSwapchain();
+        }
     }
 
     pub fn update(self: *Renderer, time_delta: f32) !void {

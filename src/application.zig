@@ -55,7 +55,7 @@ pub const Application = struct {
 
         if (self.window.handleResize()) {
             log.info("Window resized to {}x{}", .{ self.window.width, self.window.height });
-            try self.renderer.recreateSwapchain();
+            try self.renderer.handleResize();
         }
 
         try self.renderer.update(time_delta);
