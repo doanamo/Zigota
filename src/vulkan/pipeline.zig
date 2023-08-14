@@ -22,9 +22,9 @@ pub const PipelineBuilder = struct {
     };
 
     vulkan: *Vulkan = undefined,
-    shader_stages: std.ArrayListUnmanaged(ShaderStageEntry) = .{},
     shader_stages_mask: c.VkShaderStageFlagBits = 0,
-    shader_stage_create_infos: std.ArrayListUnmanaged(c.VkPipelineShaderStageCreateInfo) = .{},
+    shader_stages: std.BoundedArray(ShaderStageEntry, shader_stage_count) = .{},
+    shader_stage_create_infos: std.BoundedArray(c.VkPipelineShaderStageCreateInfo, shader_stage_count) = .{},
     vertex_binding_descriptions: std.ArrayListUnmanaged(c.VkVertexInputBindingDescription) = .{},
     vertex_attribute_descriptions: std.ArrayListUnmanaged(c.VkVertexInputAttributeDescription) = .{},
     color_attachment_format: c.VkFormat = c.VK_FORMAT_UNDEFINED,
@@ -36,19 +36,14 @@ pub const PipelineBuilder = struct {
 
     pub fn init(self: *PipelineBuilder, vulkan: *Vulkan) !void {
         errdefer self.deinit();
-
         self.vulkan = vulkan;
-
-        try self.shader_stages.ensureTotalCapacityPrecise(memory.frame_allocator, shader_stage_count);
-        try self.shader_stage_create_infos.ensureTotalCapacityPrecise(memory.frame_allocator, shader_stage_count);
     }
 
     pub fn deinit(self: *PipelineBuilder) void {
-        for (self.shader_stages.items) |*shader_stage| {
+        for (self.shader_stages.slice()) |*shader_stage| {
             shader_stage.module.deinit();
         }
 
-        self.shader_stages.deinit(memory.frame_allocator);
         self.vertex_binding_descriptions.deinit(memory.frame_allocator);
         self.vertex_attribute_descriptions.deinit(memory.frame_allocator);
         self.* = .{};
@@ -268,8 +263,8 @@ pub const PipelineBuilder = struct {
             .sType = c.VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
             .pNext = &pipeline_rendering_create_info,
             .flags = 0,
-            .stageCount = @intCast(self.shader_stage_create_infos.items.len),
-            .pStages = self.shader_stage_create_infos.items.ptr,
+            .stageCount = @intCast(self.shader_stage_create_infos.len),
+            .pStages = self.shader_stage_create_infos.slice().ptr,
             .pVertexInputState = &vertex_input_state_create_info,
             .pInputAssemblyState = &input_assembly_state_create_info,
             .pTessellationState = null,
