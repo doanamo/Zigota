@@ -22,6 +22,11 @@ pub const Window = struct {
     title_buffer: []u8 = &[_]u8{},
     title_initial: [:0]const u8 = undefined,
 
+    key_callback: struct {
+        userdata: ?*anyopaque = null,
+        function: ?*const fn (userdata: ?*anyopaque, key: c_int, scan_code: c_int, action: c_int, mods: c_int) void = null,
+    } = .{},
+
     pub fn init(self: *Window, title: [:0]const u8) !void {
         errdefer self.deinit();
 
@@ -68,6 +73,7 @@ pub const Window = struct {
 
         c.glfwSetWindowUserPointer(self.handle, self);
         _ = c.glfwSetFramebufferSizeCallback(self.handle, framebufferSizeCallback);
+        _ = c.glfwSetKeyCallback(self.handle, keyCallback);
 
         var width: c_int = undefined;
         var height: c_int = undefined;
@@ -92,6 +98,11 @@ pub const Window = struct {
     pub fn hide(self: *Window) void {
         std.debug.assert(self.handle != null);
         c.glfwHideWindow(self.handle);
+    }
+
+    pub fn close(self: *Window) void {
+        std.debug.assert(self.handle != null);
+        c.glfwSetWindowShouldClose(self.handle, c.GLFW_TRUE);
     }
 
     pub fn setTitle(self: *Window, title: [:0]const u8) void {
@@ -137,6 +148,14 @@ pub const Window = struct {
             self.minimized = false;
         } else {
             self.minimized = true;
+        }
+    }
+
+    fn keyCallback(window: ?*c.GLFWwindow, key: c_int, scan_code: c_int, action: c_int, mods: c_int) callconv(.C) void {
+        var self = @as(?*Window, @ptrCast(@alignCast(c.glfwGetWindowUserPointer(window)))) orelse unreachable;
+
+        if (self.key_callback.function != null) {
+            self.key_callback.function.?(self.key_callback.userdata, key, scan_code, action, mods);
         }
     }
 };

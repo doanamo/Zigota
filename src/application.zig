@@ -1,14 +1,17 @@
 const std = @import("std");
 const root = @import("root");
 const builtin = @import("builtin");
+const c = @import("c/c.zig");
 const memory = @import("memory.zig");
 const log = std.log.scoped(.Application);
 
 const Window = @import("glfw/window.zig").Window;
+const Input = @import("glfw/input.zig").Input;
 const Renderer = @import("renderer/renderer.zig").Renderer;
 
 pub const Application = struct {
     window: Window = .{},
+    input: Input = .{},
     renderer: Renderer = .{},
 
     fps_count: u32 = 0,
@@ -28,6 +31,11 @@ pub const Application = struct {
             return error.FailedToInitializeWindow;
         };
 
+        self.input.init(&self.window) catch |err| {
+            log.err("Failed to initialize input: {}", .{err});
+            return error.FailedToInitializeInput;
+        };
+
         self.renderer.init(&self.window) catch |err| {
             log.err("Failed to initialize renderer: {}", .{err});
             return error.FailedToInitializeRenderer;
@@ -38,6 +46,7 @@ pub const Application = struct {
         log.info("Deinitializing...", .{});
 
         self.renderer.deinit();
+        self.input.deinit();
         self.window.deinit();
         self.* = .{};
     }
@@ -56,6 +65,10 @@ pub const Application = struct {
         if (self.window.handleResize()) {
             log.info("Window resized to {}x{}", .{ self.window.width, self.window.height });
             try self.renderer.handleResize();
+        }
+
+        if (self.input.keyboard.isPressed(c.GLFW_KEY_ESCAPE)) {
+            self.window.close();
         }
 
         try self.renderer.update(time_delta);
