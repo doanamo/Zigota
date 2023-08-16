@@ -295,7 +295,7 @@ pub const Renderer = struct {
         }
     }
 
-    pub fn update(self: *Renderer, time_delta: f32) !void {
+    pub fn update(self: *Renderer, time_delta: f32) void {
         self.time += time_delta;
     }
 

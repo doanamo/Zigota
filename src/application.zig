@@ -7,12 +7,14 @@ const log = std.log.scoped(.Application);
 
 const Window = @import("glfw/window.zig").Window;
 const Input = @import("glfw/input.zig").Input;
+const Game = @import("game/game.zig").Game;
 const Renderer = @import("renderer/renderer.zig").Renderer;
 
 pub const Application = struct {
     window: Window = .{},
     input: Input = .{},
     renderer: Renderer = .{},
+    game: Game = .{},
 
     fps_count: u32 = 0,
     fps_time: f32 = 0.0,
@@ -40,11 +42,17 @@ pub const Application = struct {
             log.err("Failed to initialize renderer: {}", .{err});
             return error.FailedToInitializeRenderer;
         };
+
+        self.game.init() catch |err| {
+            log.err("Failed to initialize game: {}", .{err});
+            return error.FailedToInitializeGame;
+        };
     }
 
     pub fn deinit(self: *Application) void {
         log.info("Deinitializing...", .{});
 
+        self.game.deinit();
         self.renderer.deinit();
         self.input.deinit();
         self.window.deinit();
@@ -71,7 +79,8 @@ pub const Application = struct {
             self.window.close();
         }
 
-        try self.renderer.update(time_delta);
+        self.game.update(time_delta);
+        self.renderer.update(time_delta);
     }
 
     pub fn render(self: *Application) !void {
