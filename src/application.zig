@@ -43,7 +43,7 @@ pub const Application = struct {
             return error.FailedToInitializeRenderer;
         };
 
-        self.game.init() catch |err| {
+        self.game.init(&self.input) catch |err| {
             log.err("Failed to initialize game: {}", .{err});
             return error.FailedToInitializeGame;
         };
