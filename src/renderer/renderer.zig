@@ -37,7 +37,7 @@ pub const Renderer = struct {
     time: f32 = 0.0,
 
     pub fn init(self: *Renderer, window: *Window) !void {
-        log.info("Initializing...", .{});
+        log.info("Initializing renderer...", .{});
         errdefer self.deinit();
 
         self.vulkan.init(window) catch |err| {
@@ -62,7 +62,7 @@ pub const Renderer = struct {
     }
 
     pub fn deinit(self: *Renderer) void {
-        log.info("Deinitializing...", .{});
+        log.info("Deinitializing renderer...", .{});
 
         self.vulkan.device.waitIdle();
         self.destroyScene();

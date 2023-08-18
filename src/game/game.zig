@@ -16,6 +16,7 @@ pub const Game = struct {
     }
 
     pub fn deinit(self: *Game) void {
+        log.info("Deinitializing game...", .{});
         self.* = .{};
     }
 

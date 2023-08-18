@@ -33,7 +33,7 @@ pub const Vulkan = struct {
     transfer: Transfer = .{},
 
     pub fn init(self: *Vulkan, window: *Window) !void {
-        log.info("Initializing...", .{});
+        log.info("Initializing vulkan...", .{});
         errdefer self.deinit();
 
         self.window = window;
@@ -80,7 +80,7 @@ pub const Vulkan = struct {
     }
 
     pub fn deinit(self: *Vulkan) void {
-        log.info("Deinitializing...", .{});
+        log.info("Deinitializing vulkan...", .{});
 
         self.device.waitIdle();
         self.transfer.deinit();
