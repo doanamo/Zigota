@@ -149,7 +149,6 @@ pub const Renderer = struct {
 
         self.camera.aspect_ratio = width / height;
         self.camera.position = math.Vec3{ 0.0, -1.0, 0.0 };
-        self.camera.forward = math.Vec3{ 0.0, 1.0, 0.0 };
 
         self.mesh.init(&self.vulkan, "data/meshes/monkey.bin") catch |err| {
             log.err("Failed to load mesh ({})", .{err});

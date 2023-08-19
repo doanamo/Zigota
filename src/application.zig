@@ -7,16 +7,14 @@ const log = std.log.scoped(.Application);
 
 const Window = @import("glfw/window.zig").Window;
 const Input = @import("glfw/input.zig").Input;
-const Scene = @import("scene/scene.zig").Scene;
-const Game = @import("game/game.zig").Game;
 const Renderer = @import("renderer/renderer.zig").Renderer;
+const Game = @import("game/game.zig").Game;
 
 pub const Application = struct {
     window: Window = .{},
     input: Input = .{},
-    scene: Scene = .{},
-    game: Game = .{},
     renderer: Renderer = .{},
+    game: Game = .{},
 
     fps_count: u32 = 0,
     fps_time: f32 = 0.0,
@@ -40,28 +38,22 @@ pub const Application = struct {
             return error.FailedToInitializeInput;
         };
 
-        self.scene.init() catch |err| {
-            log.err("Failed to initialize scene: {}", .{err});
-            return error.FailedToInitializeScene;
-        };
-
-        self.game.init(&self.input) catch |err| {
-            log.err("Failed to initialize game: {}", .{err});
-            return error.FailedToInitializeGame;
-        };
-
         self.renderer.init(&self.window) catch |err| {
             log.err("Failed to initialize renderer: {}", .{err});
             return error.FailedToInitializeRenderer;
+        };
+
+        self.game.init(&self.input, &self.renderer) catch |err| {
+            log.err("Failed to initialize game: {}", .{err});
+            return error.FailedToInitializeGame;
         };
     }
 
     pub fn deinit(self: *Application) void {
         log.info("Deinitializing application...", .{});
 
-        self.renderer.deinit();
         self.game.deinit();
-        self.scene.deinit();
+        self.renderer.deinit();
         self.input.deinit();
         self.window.deinit();
         self.* = .{};

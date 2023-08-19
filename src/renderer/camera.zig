@@ -12,8 +12,8 @@ pub const Camera = struct {
     far_plane: f32 = 1000.0,
 
     position: math.Vec3 = .{ 0.0, 0.0, 0.0 },
-    forward: math.Vec3 = .{ 0.0, 0.0, -1.0 },
-    up: math.Vec3 = .{ 0.0, 0.0, 1.0 },
+    forward: math.Vec3 = math.default_forward,
+    up: math.Vec3 = math.default_up,
 
     projection: math.Mat4 = undefined,
     view: math.Mat4 = undefined,

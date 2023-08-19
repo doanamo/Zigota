@@ -23,7 +23,7 @@ pub const Input = struct {
             }
         }
 
-        pub fn isRelease(self: *@This(), key: c_int) bool {
+        pub fn isReleased(self: *@This(), key: c_int) bool {
             std.debug.assert(key >= 0 and key < c.GLFW_KEY_LAST);
             switch (self.keys[@intCast(key)]) {
                 .Pressed, .Repeat => return false,

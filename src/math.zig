@@ -9,6 +9,10 @@ pub const Vec2Component = enum { x, y };
 pub const Vec3Component = enum { x, y, z };
 pub const Vec4Component = enum { x, y, z, w };
 
+pub const default_forward = Vec3{ 0.0, 1.0, 0.0 };
+pub const default_right = Vec3{ 1.0, 0.0, 0.0 };
+pub const default_up = Vec3{ 0.0, 0.0, 1.0 };
+
 pub inline fn radians(deg: f32) f32 {
     return std.math.degreesToRadians(f32, deg);
 }
