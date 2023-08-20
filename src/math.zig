@@ -1,5 +1,6 @@
 const std = @import("std");
 
+pub const Vec1 = @Vector(1, f32);
 pub const Vec2 = @Vector(2, f32);
 pub const Vec3 = @Vector(3, f32);
 pub const Vec4 = @Vector(4, f32);
@@ -9,8 +10,8 @@ pub const Vec2Component = enum { x, y };
 pub const Vec3Component = enum { x, y, z };
 pub const Vec4Component = enum { x, y, z, w };
 
-pub const default_forward = Vec3{ 0.0, 1.0, 0.0 };
 pub const default_right = Vec3{ 1.0, 0.0, 0.0 };
+pub const default_forward = Vec3{ 0.0, 1.0, 0.0 };
 pub const default_up = Vec3{ 0.0, 0.0, 1.0 };
 
 pub inline fn radians(deg: f32) f32 {
@@ -19,6 +20,18 @@ pub inline fn radians(deg: f32) f32 {
 
 pub inline fn degrees(rad: f32) f32 {
     return std.math.radiansToDegrees(f32, rad);
+}
+
+pub inline fn wrapRadians(deg: f32) f32 {
+    const max = 2.0 * std.math.pi;
+    const mod = @mod(deg, max);
+    return if (mod >= 0.0) mod else mod + max;
+}
+
+pub inline fn wrapDegrees(deg: f32) f32 {
+    const max = degrees(2.0 * std.math.pi);
+    const mod = @mod(deg, max);
+    return if (mod >= 0.0) mod else mod + max;
 }
 
 pub inline fn splat(comptime T: type, value: f32) T {
@@ -52,6 +65,18 @@ pub inline fn length(v: anytype) f32 {
 
 pub inline fn normalize(v: anytype) @TypeOf(v) {
     return v / splat(@TypeOf(v), length(v));
+}
+
+pub inline fn isNearEqual(a: anytype, b: anytype, epsilon: f32) bool {
+    const delta = a - b;
+    const epsilons = @as(@TypeOf(delta), @splat(epsilon));
+    const result = @max(delta, -delta) <= epsilons;
+    return @reduce(.And, result);
+}
+
+pub inline fn isNearZero(v: anytype, epsilon: f32) bool {
+    const zeroes = @as(@TypeOf(v), @splat(0.0));
+    return isNearEqual(v, zeroes, epsilon);
 }
 
 pub fn identity() Mat4 {

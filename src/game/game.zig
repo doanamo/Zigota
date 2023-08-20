@@ -26,27 +26,61 @@ pub const Game = struct {
     }
 
     pub fn update(self: *Game, time_delta: f32) void {
-        var movement_direction = math.Vec3{ 0.0, 0.0, 0.0 };
+        const camera = &self.renderer.camera;
+        var rotation = math.Vec3{ 0.0, 0.0, 0.0 };
+        var movement = math.Vec3{ 0.0, 0.0, 0.0 };
+
+        if (self.input.keyboard.isPressed(c.GLFW_KEY_UP)) {
+            rotation[0] += time_delta * 100.0;
+        }
+
+        if (self.input.keyboard.isPressed(c.GLFW_KEY_DOWN)) {
+            rotation[0] -= time_delta * 100.0;
+        }
+
+        if (self.input.keyboard.isPressed(c.GLFW_KEY_RIGHT)) {
+            rotation[2] += time_delta * 100.0;
+        }
+
+        if (self.input.keyboard.isPressed(c.GLFW_KEY_LEFT)) {
+            rotation[2] -= time_delta * 100.0;
+        }
+
+        if (!math.isNearZero(rotation, 0.001)) {
+            camera.rotation += rotation;
+            camera.recalculate_forward = true;
+            camera.recalculate_view = true;
+        }
 
         if (self.input.keyboard.isPressed(c.GLFW_KEY_W)) {
-            movement_direction += math.default_forward;
+            movement += math.default_forward;
         }
 
         if (self.input.keyboard.isPressed(c.GLFW_KEY_S)) {
-            movement_direction -= math.default_forward;
+            movement -= math.default_forward;
         }
 
         if (self.input.keyboard.isPressed(c.GLFW_KEY_D)) {
-            movement_direction += math.default_right;
+            movement += math.default_right;
         }
 
         if (self.input.keyboard.isPressed(c.GLFW_KEY_A)) {
-            movement_direction -= math.default_right;
+            movement -= math.default_right;
         }
 
-        if (math.length(movement_direction) > 0.1) {
-            const camera = &self.renderer.camera;
-            camera.position += math.normalize(movement_direction) * math.splat(math.Vec3, time_delta);
+        if (self.input.keyboard.isPressed(c.GLFW_KEY_SPACE)) {
+            movement += math.default_up;
+        }
+
+        if (self.input.keyboard.isPressed(c.GLFW_KEY_C)) {
+            movement -= math.default_up;
+        }
+
+        if (math.length(movement) > 0.001) {
+            movement = math.normalize(movement);
+            camera.position += camera.getRight() * math.splat(math.Vec3, time_delta * movement[0]);
+            camera.position += camera.getForward() * math.splat(math.Vec3, time_delta * movement[1]);
+            camera.position += camera.getUp() * math.splat(math.Vec3, time_delta * movement[2]);
             camera.recalculate_view = true;
         }
     }
