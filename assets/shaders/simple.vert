@@ -26,7 +26,7 @@ void main() {
     mat4 proj_view_model =  ubo[ubo_id].projection * view_model;
 
     gl_Position = proj_view_model * vec4(in_position, 1.0);
-    out_position = (view_model * vec4(in_position, 1.0)).xyz;
+    out_position = (model * vec4(in_position, 1.0)).xyz;
     out_normal = (model * vec4(in_normal, 0.0)).xyz;
     out_color = in_color;
 }
