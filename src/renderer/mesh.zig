@@ -46,8 +46,12 @@ pub const Mesh = struct {
         }
     };
 
-    attribute_offsets: std.ArrayListUnmanaged(usize) = .{},
     vertex_buffer: Buffer = .{},
+    vertex_attributes: std.ArrayListUnmanaged(struct {
+        type: VertexAttributeType,
+        offset: usize,
+    }) = .{},
+
     index_buffer: Buffer = .{},
     index_type_bytes: u8 = undefined,
 
@@ -61,7 +65,7 @@ pub const Mesh = struct {
     }
 
     pub fn deinit(self: *Mesh) void {
-        self.attribute_offsets.deinit(memory.default_allocator);
+        self.vertex_attributes.deinit(memory.default_allocator);
         self.vertex_buffer.deinit();
         self.index_buffer.deinit();
         self.* = .{};
@@ -99,7 +103,10 @@ pub const Mesh = struct {
                 const attribute_data_size = vertices_header.vertex_count * vertex_attributes.getVertexAttributeSize(attribute);
                 try vulkan.transfer.uploadFromReader(&self.vertex_buffer, current_attribute_offset, attribute_data_size, reader);
 
-                try self.attribute_offsets.append(memory.default_allocator, current_attribute_offset);
+                try self.vertex_attributes.append(memory.default_allocator, .{
+                    .type = attribute,
+                    .offset = current_attribute_offset,
+                });
                 current_attribute_offset += attribute_data_size;
             }
         }
@@ -132,7 +139,7 @@ pub const Mesh = struct {
     }
 
     pub fn getAttributeCount(self: *Mesh) u32 {
-        return @intCast(self.attribute_offsets.items.len);
+        return @intCast(self.vertex_attributes.items.len);
     }
 
     pub fn getIndexCount(self: *Mesh) u32 {
@@ -150,20 +157,20 @@ pub const Mesh = struct {
     }
 
     pub fn fillVertexBufferHandles(self: *Mesh, array: []c.VkBuffer) void {
-        std.debug.assert(self.attribute_offsets.items.len != 0);
-        std.debug.assert(self.attribute_offsets.items.len <= array.len);
+        std.debug.assert(self.vertex_attributes.items.len != 0);
+        std.debug.assert(self.vertex_attributes.items.len <= array.len);
 
-        for (0..self.attribute_offsets.items.len) |index| {
+        for (0..self.vertex_attributes.items.len) |index| {
             array[index] = self.vertex_buffer.handle;
         }
     }
 
     pub fn fillVertexBufferOffsets(self: *Mesh, array: []c.VkDeviceSize) void {
-        std.debug.assert(self.attribute_offsets.items.len != 0);
-        std.debug.assert(self.attribute_offsets.items.len <= array.len);
+        std.debug.assert(self.vertex_attributes.items.len != 0);
+        std.debug.assert(self.vertex_attributes.items.len <= array.len);
 
-        for (0..self.attribute_offsets.items.len) |index| {
-            array[index] = self.attribute_offsets.items[index];
+        for (0..self.vertex_attributes.items.len) |index| {
+            array[index] = self.vertex_attributes.items[index].offset;
         }
     }
 };
