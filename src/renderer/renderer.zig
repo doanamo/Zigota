@@ -164,7 +164,7 @@ pub const Renderer = struct {
         const uniform_object = VertexTransformUniform{
             .model = math.mul(
                 math.scaling(math.splat(math.Vec3, 0.5)),
-                math.rotation(math.Vec3{ 0.0, 0.0, math.radians(30.0) * self.time }),
+                math.rotationZ(math.radians(30.0) * self.time),
             ),
             .view = self.camera.getView(),
             .projection = self.camera.getProjection(),

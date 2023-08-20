@@ -88,7 +88,7 @@ pub fn identity() Mat4 {
     };
 }
 
-pub fn mul(a: Mat4, b: Mat4) Mat4 {
+pub fn mulMatMat(a: Mat4, b: Mat4) Mat4 {
     var result: Mat4 = undefined;
     comptime var row: u32 = 0;
     inline while (row < 4) : (row += 1) {
@@ -99,6 +99,35 @@ pub fn mul(a: Mat4, b: Mat4) Mat4 {
         result[row] = @mulAdd(Vec4, vx, b[0], vz * b[2]) + @mulAdd(Vec4, vy, b[1], vw * b[3]);
     }
     return result;
+}
+
+pub fn mulMatVec(a: Mat4, b: Vec4) Vec4 {
+    return .{
+        dot(a[0], b),
+        dot(a[1], b),
+        dot(a[2], b),
+        dot(a[3], b),
+    };
+}
+
+pub fn mulReturnType(comptime a: type, comptime b: type) type {
+    if (a == Mat4 and b == Mat4) {
+        return Mat4;
+    } else if (a == Mat4 and b == Vec4) {
+        return Vec4;
+    } else {
+        @compileError("Unexpected types, found '" ++ @typeName(a) ++ "' and '" ++ @typeName(b) ++ "'");
+    }
+}
+
+pub fn mul(a: anytype, b: anytype) mulReturnType(@TypeOf(a), @TypeOf(b)) {
+    if (@TypeOf(a) == Mat4 and @TypeOf(b) == Mat4) {
+        return mulMatMat(a, b);
+    } else if (@TypeOf(a) == Mat4 and @TypeOf(b) == Vec4) {
+        return mulMatVec(a, b);
+    } else {
+        @compileError("Unexpected types, found '" ++ @typeName(@TypeOf(a)) ++ "' and '" ++ @typeName(@TypeOf(b)) ++ "'");
+    }
 }
 
 pub fn transpose(m: Mat4) Mat4 {
@@ -134,6 +163,78 @@ pub fn rotation(angles: Vec3) Mat4 {
         Vec4{ s[1], -c[1] * s[0], c[0] * c[1], 0.0 },
         Vec4{ 0.0, 0.0, 0.0, 1.0 },
     };
+}
+
+pub fn rotationX(angle: f32) Mat4 {
+    const s = @sin(angle);
+    const c = @cos(angle);
+
+    return .{
+        Vec4{ 1.0, 0.0, 0.0, 0.0 },
+        Vec4{ 0.0, c, s, 0.0 },
+        Vec4{ 0.0, -s, c, 0.0 },
+        Vec4{ 0.0, 0.0, 0.0, 1.0 },
+    };
+}
+
+pub fn rotationY(angle: f32) Mat4 {
+    const s = @sin(angle);
+    const c = @cos(angle);
+
+    return .{
+        Vec4{ c, 0.0, -s, 0.0 },
+        Vec4{ 0.0, 1.0, 0.0, 0.0 },
+        Vec4{ s, 0.0, c, 0.0 },
+        Vec4{ 0.0, 0.0, 0.0, 1.0 },
+    };
+}
+
+pub fn rotationZ(angle: f32) Mat4 {
+    const s = @sin(angle);
+    const c = @cos(angle);
+
+    return .{
+        Vec4{ c, s, 0.0, 0.0 },
+        Vec4{ -s, c, 0.0, 0.0 },
+        Vec4{ 0.0, 0.0, 1.0, 0.0 },
+        Vec4{ 0.0, 0.0, 0.0, 1.0 },
+    };
+}
+
+pub fn rotationAxis(angle: f32, axis: Vec3) Mat4 {
+    const s = @sin(angle);
+    const c = @cos(angle);
+    const t = 1.0 - c;
+
+    const a2 = axis * axis;
+    const xs = axis[0] * s;
+    const ys = axis[1] * s;
+    const zs = axis[2] * s;
+    const xyt = axis[0] * axis[1] * t;
+    const zxt = axis[2] * axis[0] * t;
+    const yzt = axis[1] * axis[2] * t;
+
+    var result: Mat4 = undefined;
+    result[0][0] = a2[0] + c * (1.0 - a2[0]);
+    result[1][1] = a2[1] + c * (1.0 - a2[1]);
+    result[2][2] = a2[2] + c * (1.0 - a2[2]);
+
+    result[0][1] = xyt + zs;
+    result[1][0] = xyt - zs;
+    result[0][2] = zxt - ys;
+    result[2][0] = zxt + ys;
+    result[1][2] = yzt + xs;
+    result[2][1] = yzt - xs;
+
+    result[0][3] = 0.0;
+    result[1][3] = 0.0;
+    result[2][3] = 0.0;
+    result[3][0] = 0.0;
+    result[3][1] = 0.0;
+    result[3][2] = 0.0;
+    result[3][3] = 1.0;
+
+    return result;
 }
 
 pub fn scaling(scale: Vec3) Mat4 {
