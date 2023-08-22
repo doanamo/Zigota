@@ -1,6 +1,6 @@
 const std = @import("std");
 const root = @import("root");
-const c = @import("../c/c.zig");
+const c = @import("../cimport/c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);

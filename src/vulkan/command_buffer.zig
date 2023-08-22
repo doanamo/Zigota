@@ -1,5 +1,5 @@
 const std = @import("std");
-const c = @import("../c/c.zig");
+const c = @import("../cimport/c.zig");
 const utility = @import("utility.zig");
 const log = std.log.scoped(.Vulkan);
 const check = utility.vulkanCheckResult;

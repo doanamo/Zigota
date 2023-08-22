@@ -201,7 +201,7 @@ fn addDependencyVulkan(builder: *std.build.Builder, exe: *std.build.LibExeObjSte
     try flags.append("-std=c++11");
 
     vulkan.addIncludePath(.{ .path = environment.vulkan_include_path });
-    vulkan.addCSourceFile(.{ .file = .{ .path = "src/c/vulkan.cpp" }, .flags = flags.items });
+    vulkan.addCSourceFile(.{ .file = .{ .path = "src/cimport/vulkan.cpp" }, .flags = flags.items });
     vulkan.linkLibCpp();
 
     exe.addIncludePath(.{ .path = environment.vulkan_include_path });
@@ -240,7 +240,7 @@ fn addDependencyVma(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) 
 
     vma.addIncludePath(.{ .path = environment.vulkan_include_path });
     vma.addIncludePath(.{ .path = "deps/vma/src/" });
-    vma.addCSourceFile(.{ .file = .{ .path = "src/c/vma.cpp" }, .flags = flags.items });
+    vma.addCSourceFile(.{ .file = .{ .path = "src/cimport/vma.cpp" }, .flags = flags.items });
     vma.linkLibCpp();
 
     exe.addIncludePath(.{ .path = "deps/vma/src/" });
@@ -411,7 +411,7 @@ fn createGame(builder: *std.build.Builder) !void {
         game.subsystem = .Windows; // Hide console window
     }
 
-    game.addIncludePath(.{ .path = "src/c/" });
+    game.addIncludePath(.{ .path = "src/cimport/" });
     try addDependencyMimalloc(builder, game);
     try addDependencyGlfw(builder, game);
     try addDependencyVolk(builder, game);

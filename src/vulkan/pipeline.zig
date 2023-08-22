@@ -1,5 +1,5 @@
 const std = @import("std");
-const c = @import("../c/c.zig");
+const c = @import("../cimport/c.zig");
 const memory = @import("memory.zig");
 const utility = @import("utility.zig");
 const vertex_attributes = @import("vertex_attributes.zig");

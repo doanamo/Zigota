@@ -1,4 +1,4 @@
-const c = @import("../c/c.zig");
+const c = @import("../cimport/c.zig");
 
 pub const max_attributes: u32 = 8;
 

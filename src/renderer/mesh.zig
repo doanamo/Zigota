@@ -1,5 +1,5 @@
 const std = @import("std");
-const c = @import("../c/c.zig");
+const c = @import("../cimport/c.zig");
 const memory = @import("../common/memory.zig");
 const utility = @import("../common/utility.zig");
 const log = std.log.scoped(.Renderer);

@@ -1,4 +1,4 @@
-const c = @import("../c/c.zig");
+const c = @import("../cimport/c.zig");
 const math = @import("../common/math.zig");
 
 pub const VertexTransformUniform = struct {
