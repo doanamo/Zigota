@@ -17,7 +17,6 @@ const PipelineBuilder = @import("../vulkan/pipeline.zig").PipelineBuilder;
 const Pipeline = @import("../vulkan/pipeline.zig").Pipeline;
 const vertex_attributes = @import("../vulkan/vertex_attributes.zig");
 
-const VertexTransformUniform = @import("uniform_types.zig").VertexTransformUniform;
 const Camera = @import("camera.zig").Camera;
 const Mesh = @import("mesh.zig").Mesh;
 
@@ -26,6 +25,12 @@ pub const Renderer = struct {
         command_pool: CommandPool = .{},
         command_buffer: CommandBuffer = .{},
         uniform_buffer: Buffer = .{},
+    };
+
+    pub const VertexTransformUniform = struct {
+        model: math.Mat4,
+        view: math.Mat4,
+        projection: math.Mat4,
     };
 
     vulkan: Vulkan = .{},
