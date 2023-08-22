@@ -1,8 +1,8 @@
 const std = @import("std");
 const c = @import("../c/c.zig");
-const memory = @import("../memory.zig");
-const utility = @import("../utility.zig");
-const math = @import("../math.zig");
+const memory = @import("../common/memory.zig");
+const utility = @import("../common/utility.zig");
+const math = @import("../common/math.zig");
 const log = std.log.scoped(.Game);
 
 const Input = @import("../glfw/input.zig").Input;

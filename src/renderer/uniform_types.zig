@@ -1,5 +1,5 @@
 const c = @import("../c/c.zig");
-const math = @import("../math.zig");
+const math = @import("../common/math.zig");
 
 pub const VertexTransformUniform = struct {
     model: math.Mat4,

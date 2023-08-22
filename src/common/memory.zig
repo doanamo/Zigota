@@ -1,5 +1,5 @@
 const std = @import("std");
-const c = @import("c/c.zig");
+const c = @import("../c/c.zig");
 const log = std.log.scoped(.Memory);
 
 pub var frame_arena_allocator: std.heap.ArenaAllocator = undefined;

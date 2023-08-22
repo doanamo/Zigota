@@ -1,6 +1,6 @@
 const std = @import("std");
 const c = @import("../c/c.zig");
-const math = @import("../math.zig");
+const math = @import("../common/math.zig");
 const memory = @import("../vulkan/memory.zig");
 const utility = @import("../vulkan/utility.zig");
 const log = std.log.scoped(.Renderer);

@@ -2,7 +2,7 @@ const std = @import("std");
 const root = @import("root");
 const builtin = @import("builtin");
 const c = @import("c/c.zig");
-const memory = @import("memory.zig");
+const memory = @import("common/memory.zig");
 const log = std.log.scoped(.Application);
 
 const Window = @import("glfw/window.zig").Window;

@@ -1,4 +1,4 @@
-pub usingnamespace @import("../utility.zig");
+pub usingnamespace @import("../common/utility.zig");
 
 const std = @import("std");
 const c = @import("../c/c.zig");

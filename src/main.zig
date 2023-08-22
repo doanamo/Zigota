@@ -1,7 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const c = @import("c/c.zig");
-const memory = @import("memory.zig");
+const memory = @import("common/memory.zig");
 const log = std.log.scoped(.Main);
 
 const glfw = @import("glfw/glfw.zig");

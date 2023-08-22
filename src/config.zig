@@ -1,6 +1,6 @@
 const std = @import("std");
-const memory = @import("memory.zig");
-const utility = @import("utility.zig");
+const memory = @import("common/memory.zig");
+const utility = @import("common/utility.zig");
 const log = std.log.scoped(.Config);
 
 const WindowConfig = @import("glfw/window.zig").Window.Config;

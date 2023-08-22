@@ -1,6 +1,5 @@
 const std = @import("std");
 const c = @import("../c/c.zig");
-const memory = @import("../memory.zig");
 const log = std.log.scoped(.GLFW);
 
 const Window = @import("window.zig").Window;

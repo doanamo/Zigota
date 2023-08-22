@@ -2,8 +2,8 @@ const std = @import("std");
 const builtin = @import("builtin");
 const root = @import("root");
 const c = @import("../c/c.zig");
-const memory = @import("../memory.zig");
-const utility = @import("../utility.zig");
+const memory = @import("../common/memory.zig");
+const utility = @import("../common/utility.zig");
 const log = std.log.scoped(.GLFW);
 
 pub const Window = struct {
