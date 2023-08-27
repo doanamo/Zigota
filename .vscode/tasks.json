@@ -18,6 +18,12 @@
             "type": "shell",
             "command": "zig build -Doptimize=ReleaseFast --prefix-exe-dir bin/release-fast",
             "group": "build",
+        },
+        {
+            "label": "build-tests",
+            "type": "shell",
+            "command": "zig build tests",
+            "group": "build",
         }
     ]
 }

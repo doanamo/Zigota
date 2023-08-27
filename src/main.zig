@@ -55,3 +55,7 @@ pub fn main() !void {
     // Exit
     log.info("Exiting application...", .{});
 }
+
+test {
+    _ = @import("common/queue.zig");
+}

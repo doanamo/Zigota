@@ -32,6 +32,16 @@
             "console": "internalConsole",
         },
         {
+            "type": "cppvsdbg",
+            "request": "launch",
+            "name": "Tests",
+            "program": "${workspaceFolder}/zig-out/bin/tests.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/deploy/",
+            "preLaunchTask": "build-tests",
+            "console": "internalConsole",
+        },
+        {
             // This is just an example of how to run build.zig under debugger
             // Paths need to be manually adjusted to your environment
             "type": "cppvsdbg",

@@ -420,21 +420,22 @@ fn createGame(builder: *std.build.Builder) !void {
     try addDependencyVma(builder, game);
     try compileShaders(builder, game);
     try exportMeshes(builder, game);
-    builder.installArtifact(game);
 
+    builder.installArtifact(game);
     const run = builder.addRunArtifact(game);
     const run_step = builder.step("run", "Run game");
     run_step.dependOn(&run.step);
 }
 
 fn createTests(builder: *std.build.Builder) !void {
-    const exe_tests = builder.addTest(.{
+    const tests = builder.addTest(.{
         .name = "tests",
         .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
 
-    const test_step = builder.step("test", "Run tests");
-    test_step.dependOn(&exe_tests.step);
+    const install = builder.addInstallArtifact(tests, .{});
+    const test_step = builder.step("tests", "Build tests");
+    test_step.dependOn(&install.step);
 }
