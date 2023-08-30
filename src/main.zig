@@ -56,6 +56,6 @@ pub fn main() !void {
     log.info("Exiting application...", .{});
 }
 
-test {
+test "main" {
     _ = @import("common/queue.zig");
 }
