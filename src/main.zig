@@ -57,5 +57,5 @@ pub fn main() !void {
 }
 
 test "main" {
-    _ = @import("common/queue.zig");
+    _ = @import("common/common.zig");
 }
