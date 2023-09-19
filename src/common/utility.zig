@@ -49,7 +49,7 @@ pub fn findExecutable(allocator: std.mem.Allocator, name: []const u8) ![]const u
     process.stdin_behavior = .Close;
     try process.spawn();
 
-    const output = try process.stdout.?.readToEndAlloc(allocator, 512);
+    const output = try process.stdout.?.readToEndAlloc(allocator, 1024);
     errdefer allocator.free(output);
 
     switch (try process.wait()) {

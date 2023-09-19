@@ -46,10 +46,10 @@
             // Paths need to be manually adjusted to your environment
             "type": "cppvsdbg",
             "request": "launch",
-            "name": "Zig Build",
-            "program": "${workspaceFolder}/zig-cache/o/7c02fa84a1b1770678cc4c9ce5099851/build.exe",
+            "name": "Build",
+            "program": "${workspaceFolder}/zig-cache/o/79ee336b227ead198a1b0fc7494047ec/build.exe",
             "args": [
-                "C:/Zig/zig-windows-x86_64-0.11.0-dev.3947+89396ff02/zig.exe",
+                "C:/Zig/zig-windows-x86_64-0.12.0-dev.47+0461a64a9/zig.exe",
                 ".", "./zig-cache", "C:/Users/doanp/AppData/Local/zig",
                 "-Doptimize=Debug", "--prefix-exe-dir", "bin/debug"
             ],
