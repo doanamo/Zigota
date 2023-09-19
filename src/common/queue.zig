@@ -113,6 +113,10 @@ pub fn Queue(comptime T: type) type {
         pub fn getUnusedCapacity(self: *const Self) usize {
             return self.items.len - self.count;
         }
+
+        pub fn isEmpty(self: *const Self) bool {
+            return self.count == 0;
+        }
     };
 }
 
