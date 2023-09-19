@@ -235,21 +235,21 @@ fn addDependencyVma(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) 
 }
 
 fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
-    const input_dir_path = try std.fs.path.resolve(allocator, &[_][]const u8{"assets/shaders/"});
-    defer allocator.free(input_dir_path);
-
-    const output_dir_path = try std.fs.path.resolve(allocator, &[_][]const u8{"deploy/data/shaders/"});
-    defer allocator.free(output_dir_path);
+    const input_dir_path = "assets/shaders/";
+    const output_dir_path = "deploy/data/shaders/";
     try std.fs.cwd().makePath(output_dir_path);
-
-    var input_dir = try std.fs.cwd().openIterableDir(input_dir_path, .{});
-    defer input_dir.close();
 
     var manifest_dir = try std.fs.cwd().makeOpenPath("zig-cache/assets/shaders/", .{});
     defer manifest_dir.close();
 
+    var working_dir = try std.fs.cwd().openDir(".", .{});
+    defer working_dir.close();
+
     var cache = std.Build.Cache{ .gpa = allocator, .manifest_dir = manifest_dir };
-    cache.addPrefix(.{ .path = null, .handle = input_dir.dir });
+    cache.addPrefix(.{ .path = null, .handle = working_dir });
+
+    var input_dir = try std.fs.cwd().openIterableDir(input_dir_path, .{});
+    defer input_dir.close();
 
     var walker = try input_dir.walk(allocator);
     defer walker.deinit();
@@ -278,7 +278,7 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
         defer manifest.deinit();
 
         _ = try manifest.addFile(environment.glslc_exe_path, null);
-        _ = try manifest.addFile(entry.path, null);
+        _ = try manifest.addFile(input_file_path, null);
         if (try manifest.hit() and output_exists) {
             continue;
         }
@@ -299,25 +299,22 @@ fn compileShaders(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !v
 }
 
 fn exportMeshes(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !void {
-    const input_dir_path = try std.fs.path.resolve(allocator, &[_][]const u8{"assets/meshes/"});
-    defer allocator.free(input_dir_path);
-
-    const output_dir_path = try std.fs.path.resolve(allocator, &[_][]const u8{"deploy/data/meshes/"});
-    defer allocator.free(output_dir_path);
+    const export_script_path = "tools/mesh_export.py";
+    const input_dir_path = "assets/meshes/";
+    const output_dir_path = "deploy/data/meshes/";
     try std.fs.cwd().makePath(output_dir_path);
-
-    var input_dir = try std.fs.cwd().openIterableDir(input_dir_path, .{});
-    defer input_dir.close();
 
     var manifest_dir = try std.fs.cwd().makeOpenPath("zig-cache/assets/meshes/", .{});
     defer manifest_dir.close();
 
-    var cache = std.Build.Cache{ .gpa = allocator, .manifest_dir = manifest_dir };
-    cache.addPrefix(.{ .path = null, .handle = input_dir.dir });
+    var working_dir = try std.fs.cwd().openDir(".", .{});
+    defer working_dir.close();
 
-    const export_script_filename = "export.py";
-    const export_script_path = try std.fs.path.join(allocator, &[_][]const u8{ input_dir_path, export_script_filename });
-    defer allocator.free(export_script_path);
+    var cache = std.Build.Cache{ .gpa = allocator, .manifest_dir = manifest_dir };
+    cache.addPrefix(.{ .path = null, .handle = working_dir });
+
+    var input_dir = try std.fs.cwd().openIterableDir(input_dir_path, .{});
+    defer input_dir.close();
 
     var walker = try input_dir.walk(allocator);
     defer walker.deinit();
@@ -329,10 +326,6 @@ fn exportMeshes(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !voi
 
         const input_file_path = try std.fs.path.join(allocator, &[_][]const u8{ input_dir_path, entry.path });
         defer allocator.free(input_file_path);
-
-        if (std.mem.eql(u8, input_file_path, export_script_path)) {
-            continue;
-        }
 
         const output_file_name = try std.fmt.allocPrint(allocator, "{s}.bin", .{std.fs.path.stem(entry.path)});
         defer allocator.free(output_file_name);
@@ -350,8 +343,8 @@ fn exportMeshes(builder: *std.build.Builder, exe: *std.build.LibExeObjStep) !voi
         defer manifest.deinit();
 
         _ = try manifest.addFile(environment.blender_exe_path, null);
-        _ = try manifest.addFile(export_script_filename, null);
-        _ = try manifest.addFile(entry.path, null);
+        _ = try manifest.addFile(export_script_path, null);
+        _ = try manifest.addFile(input_file_path, null);
         if (try manifest.hit() and output_exists) {
             continue;
         }

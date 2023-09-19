@@ -1,4 +1,4 @@
-# Example usage: blender ".\assets\meshes\cube.blend" -b -P ".\assets\meshes\export.py" -- ".\deploy\data\meshes\cube.bin"
+# Example usage: blender "assets/meshes/cube.blend" -b -P "tools/mesh_export.py" -- "deploy/data/meshes/cube.bin"
 #
 # Binary format:
 #   Header:
