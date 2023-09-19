@@ -9,6 +9,7 @@ const Vulkan = @import("vulkan.zig").Vulkan;
 const Device = @import("device.zig").Device;
 const Buffer = @import("buffer.zig").Buffer;
 const DescriptorPool = @import("descriptor_pool.zig").DescriptorPool;
+const Queue = @import("../common/queue.zig").Queue;
 
 pub const Bindless = struct {
     pub const IdentifierType = u32;
@@ -24,10 +25,10 @@ pub const Bindless = struct {
     descriptor_set: c.VkDescriptorSet = null,
     pipeline_layout: c.VkPipelineLayout = null,
 
-    uniform_buffers_next_id: u32 = 0,
-    uniform_buffers_free_ids: std.fifo.LinearFifo(u32, .Dynamic) = undefined,
-
+    uniform_buffer_next_id: u32 = 0,
+    uniform_buffer_free_ids: Queue(u32) = .{},
     uniform_buffer_infos: std.ArrayListUnmanaged(c.VkDescriptorBufferInfo) = .{},
+
     descriptor_set_writes: std.ArrayListUnmanaged(c.VkWriteDescriptorSet) = .{},
 
     pub fn init(self: *Bindless, vulkan: *Vulkan) !void {
@@ -35,7 +36,6 @@ pub const Bindless = struct {
         errdefer self.deinit();
 
         self.vulkan = vulkan;
-        self.uniform_buffers_free_ids = @TypeOf(self.uniform_buffers_free_ids).init(memory.default_allocator);
 
         self.createDescriptorPool() catch |err| {
             log.err("Failed to create descriptor pool: {}", .{err});
@@ -60,9 +60,9 @@ pub const Bindless = struct {
 
     pub fn deinit(self: *Bindless) void {
         // Allocated descriptor set is freed when the descriptor pool is destroyed.
-        self.uniform_buffer_infos.deinit(memory.default_allocator);
         self.descriptor_set_writes.deinit(memory.default_allocator);
-        self.uniform_buffers_free_ids.deinit();
+        self.uniform_buffer_infos.deinit(memory.default_allocator);
+        self.uniform_buffer_free_ids.deinit(memory.default_allocator);
         self.destroyPipelineLayout();
         self.destroyDescriptorSetLayout();
         self.destroyDescriptorPool();
@@ -198,11 +198,11 @@ pub const Bindless = struct {
         std.debug.assert(uniform_buffer.usage_flags & c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT != 0);
 
         var bindless_id: u32 = undefined;
-        if (self.uniform_buffers_free_ids.count > 0) {
-            bindless_id = self.uniform_buffers_free_ids.readItem().?;
+        if (!self.uniform_buffer_free_ids.isEmpty()) {
+            bindless_id = self.uniform_buffer_free_ids.pop() catch unreachable;
         } else {
-            bindless_id = self.uniform_buffers_next_id;
-            self.uniform_buffers_next_id += 1;
+            bindless_id = self.uniform_buffer_next_id;
+            self.uniform_buffer_next_id += 1;
         }
 
         std.debug.assert(bindless_id < invalid_id);
@@ -233,8 +233,8 @@ pub const Bindless = struct {
     }
 
     fn unregisterUniformBuffer(self: *Bindless, bindless_id: IdentifierType) void {
-        std.debug.assert(bindless_id < self.uniform_buffers_next_id);
-        self.uniform_buffers_free_ids.writeItem(bindless_id) catch unreachable;
+        std.debug.assert(bindless_id < self.uniform_buffer_next_id);
+        self.uniform_buffer_free_ids.push(memory.default_allocator, bindless_id) catch unreachable;
     }
 
     pub fn updateDescriptorSet(self: *Bindless) void {
