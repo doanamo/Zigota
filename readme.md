@@ -6,3 +6,7 @@ Prerequisites
 * Blender: [3.6.2](https://www.blender.org/download/)
 
 Binaries of prerequisities must be available from PATH environment.
+
+Screenshots
+===========
+![](docs/screenshot.jpg)
