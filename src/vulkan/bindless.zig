@@ -11,13 +11,23 @@ const Buffer = @import("buffer.zig").Buffer;
 const DescriptorPool = @import("descriptor_pool.zig").DescriptorPool;
 const Queue = @import("../common/queue.zig").Queue;
 
+// TODO: Consider using HandleMap for bindless resources
+// TODO: Add validation for bindless handless (e.g. with versioning)
+// https://vulkan.org/user/pages/09.events/vulkanised-2023/vulkanised_2023_setting_up_a_bindless_rendering_pipeline.pdf
+
 pub const Bindless = struct {
     pub const IdentifierType = u32;
 
     pub const descriptor_count = std.math.maxInt(u16);
     pub const invalid_id = std.math.maxInt(u16);
 
-    const uniform_buffer_binding = 0;
+    const ShaderConstants = struct {
+        // Values must match bindless.glsl shader
+        const descriptor_set_id = 0;
+        const uniform_binding_id = 0;
+        const storage_binding_id = 1;
+        const sampler_binding_id = 2;
+    };
 
     vulkan: *Vulkan = undefined,
     descriptor_pool: DescriptorPool = .{},
@@ -89,7 +99,7 @@ pub const Bindless = struct {
     fn createDescriptorSetLayout(self: *Bindless) !void {
         const layout_bindings = [_]c.VkDescriptorSetLayoutBinding{
             .{
-                .binding = uniform_buffer_binding,
+                .binding = ShaderConstants.uniform_binding_id,
                 .descriptorType = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 .descriptorCount = descriptor_count,
                 .stageFlags = c.VK_SHADER_STAGE_ALL,
@@ -220,7 +230,7 @@ pub const Bindless = struct {
             .sType = c.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .pNext = null,
             .dstSet = self.descriptor_set,
-            .dstBinding = uniform_buffer_binding,
+            .dstBinding = ShaderConstants.uniform_binding_id,
             .dstArrayElement = bindless_id,
             .descriptorCount = 1,
             .descriptorType = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,

@@ -2,6 +2,16 @@
 
 #include "bindless.glsl"
 
+layout(binding = BindlessUniformBinding) uniform UniformBufferObject {
+    mat4 model;
+    mat4 view;
+    mat4 projection;
+} ubo[];
+
+layout(push_constant) uniform PushConstant {
+    uint ubo_id;
+};
+
 layout(location = 0) in vec3 in_position;
 layout(location = 1) in vec3 in_normal;
 layout(location = 2) in vec4 in_color;

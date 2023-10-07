@@ -1,11 +1,9 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 
-layout(push_constant) uniform PushConstant {
-    uint ubo_id;
-};
+// Values must match bindless.zig source
+#define BindlessDescriptorSet 0
+#define BindlessUniformBinding 0
+#define BindlessStorageBinding 1
+#define BindlessTextureBinding 2
 
-layout(binding = 0) uniform UniformBufferObject {
-    mat4 model;
-    mat4 view;
-    mat4 projection;
-} ubo[];
+// TODO: Add samplers here once ready
