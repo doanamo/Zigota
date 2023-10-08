@@ -7,12 +7,14 @@ const log = std.log.scoped(.Application);
 
 const Window = @import("glfw/window.zig").Window;
 const Input = @import("glfw/input.zig").Input;
+const Scene = @import("scene/scene.zig").Scene;
 const Renderer = @import("renderer/renderer.zig").Renderer;
 const Game = @import("game/game.zig").Game;
 
 pub const Application = struct {
     window: Window = .{},
     input: Input = .{},
+    scene: Scene = .{},
     renderer: Renderer = .{},
     game: Game = .{},
 
@@ -38,6 +40,11 @@ pub const Application = struct {
             return error.FailedToInitializeInput;
         };
 
+        self.scene.init() catch |err| {
+            log.err("Failed to initialize scene: {}", .{err});
+            return error.FailedToInitializeScene;
+        };
+
         self.renderer.init(&self.window) catch |err| {
             log.err("Failed to initialize renderer: {}", .{err});
             return error.FailedToInitializeRenderer;
@@ -54,6 +61,7 @@ pub const Application = struct {
 
         self.game.deinit();
         self.renderer.deinit();
+        self.scene.deinit();
         self.input.deinit();
         self.window.deinit();
         self.* = .{};
